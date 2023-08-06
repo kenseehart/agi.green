@@ -30,13 +30,15 @@ class ChatNode(Dispatcher):
     '''
 
     async def on_mq_chat(self, author:str, content:str):
-        'receive chat message from RabbitMQ'
+        'receive chat message from RabbitMQ - append to chat dialog in browser ui'
         await self.send_ws('append_chat', content=content)
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket - broadcast to peers (including self)'
         await self.send_mq('chat', author=f'{self.name}', content=content)
 ```
+
+These are not predefined overloaded methods. You can add any methods that are prefixed with `on_{protocol}_{command}` with arbitrary named arguments, and these handler methods will autoregister. Send messages with `send_{protocol}(command, **kwargs)` with corresponding arguments. Predefined protocols are `ws` (socket connection to browser ui) and `mq` (amqp broadcast to peers, including echo to self)
 
 ## Intended applications for this framework:
 
