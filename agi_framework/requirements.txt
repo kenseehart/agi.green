@@ -1,0 +1,4 @@
+aiohttp
+aio_pika==9.2.0
+websockets
+ptvsd==4.3.2

@@ -1,0 +1,59 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build_and_run",
+            "type": "shell",
+            "command": "docker build -t chat-app . ; docker run -it -d -p 8000:8000 --network mynetwork --name chat-run chat-app-8000 python -u chatnode.py",
+            "isBackground": true,
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": {
+                "owner": "docker",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*):\\s+(error|warning|info)\\s+(.*)$",
+                    "file": 1,
+                    "severity": 2,
+                    "message": 3
+                }
+            }
+        },
+        {
+            "label": "build_and_run_for_debug",
+            "type": "shell",
+            "command": "docker build -t chat-app . ; docker run -it -d -p8000:8000 -p8001:8001 -p 5678:5678 --network mynetwork --name chat-debug-8000 chat-app python -u chatnode.py -d",
+            "isBackground": true,
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": {
+                "owner": "docker",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*):\\s+(error|warning|info)\\s+(.*)$",
+                    "file": 1,
+                    "severity": 2,
+                    "message": 3
+                }
+            }
+        },
+        {
+            "label": "wait_for_port",
+            "type": "shell",
+            "command": "python3",
+            "args": ["wait_for_port.py"],
+            "problemMatcher": []
+        },
+        {
+            "label": "build_run_debug",
+            "dependsOrder": "sequence",
+            "dependsOn": ["build_and_run_for_debug", "wait_for_port"],
+            "problemMatcher": []
+        }
+
+    ]
+}
