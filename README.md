@@ -43,5 +43,6 @@ These are not predefined overloaded methods. You can add any methods that are pr
 ## Intended applications for this framework:
 
 - fish: fantastic imap sorting hat (conversational email sorting)
+- yara: yet another research assistant (interactively build an up to date expert on any topic)
 - various experiments in layered language models
   
