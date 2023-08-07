@@ -10,17 +10,17 @@
             "justMyCode": true
           },
         {
-            "name": "Python: app.py",
+            "name": "Local chatnode.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/app.py",
+            "program": "${workspaceFolder}/chatnode.py",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
         },
         {
-            "name": "Docker: Python",
+            "name": "Docker: chatnode.py",
             "type": "python",
             "request": "attach",
             "connect": {

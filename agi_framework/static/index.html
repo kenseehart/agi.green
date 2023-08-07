@@ -6,9 +6,13 @@
 </head>
 <body>
     <div id="messages"></div>
-    <textarea id="inputText" placeholder="Type your message" rows="4"></textarea>
 
-    <button onclick="onChatInput()">Send</button>
+    <div id="chat-input-area">
+        <textarea id="chat-input-text" placeholder="Type your message"></textarea>
+        <button id="send-button" onclick="onChatInput()">
+            <img src="send-button.png" alt="Send">
+        </button>
+    </div>
 
     <div id="debug">
         <!-- debug info here -->

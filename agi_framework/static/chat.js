@@ -90,7 +90,7 @@ function error(msg) {
 // Function to send messages to the server
 function onChatInput() {
     console.log('onChatInput()');
-    const inputText = document.getElementById('inputText');
+    const inputText = document.getElementById('chat-input-text');
     const message = inputText.value.trim();
     console.log('message:', message);
     if (message !== '') {
@@ -107,6 +107,7 @@ function onChatInput() {
         console.log('message sent:', message);
 
         inputText.value = '';  // Clear the input field
+        autoResize.call(document.getElementById('chat-input-text'));
     }
 }
 
@@ -123,6 +124,13 @@ socket.onclose = function(event) {
 };
 
 
+function autoResize() {
+    this.style.height = 'inherit'; // Briefly shrink textarea to minimal size
+    this.style.height = `${this.scrollHeight}px`; // Increase textarea height to its scroll-height
+}
+
+document.getElementById('chat-input-text').addEventListener('input', autoResize);
+autoResize.call(document.getElementById('chat-input-text'));
 
 
 
