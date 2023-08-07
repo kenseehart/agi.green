@@ -5,17 +5,25 @@
     <link rel="stylesheet" href="chat.css?_t=__TIMESTAMP__" /> <!-- timestamp is used to prevent caching -->
 </head>
 <body>
-    <div id="messages"></div>
+    <div class="app-layout" style="display: flex">
+        <div id="chat-pane">
+            <div id="messages"></div>
 
-    <div id="chat-input-area">
-        <textarea id="chat-input-text" placeholder="Type your message"></textarea>
-        <button id="send-button" onclick="onChatInput()">
-            <img src="send-button.png" alt="Send">
-        </button>
-    </div>
+            <div id="chat-input-area">
+                <textarea id="chat-input-text" placeholder="Type your message"></textarea>
+                <button id="send-button" onclick="onChatInput()">
+                    <img src="send-button.png" alt="Send">
+                </button>
+            </div>
 
-    <div id="debug">
-        <!-- debug info here -->
+            <div id="debug">
+                <!-- debug info here -->
+            </div>
+        </div>
+        <div class="vsplitter" id="vsplitter"></div>
+        <div id="workspace-pane" style="flex: 1 1 0%;">
+            <div id="workspace"></div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/markdown-it@10/dist/markdown-it.min.js"></script>
@@ -24,6 +32,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/styles/default.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/highlight.min.js"></script>
 
+    <script src="splitter.js?_t=__TIMESTAMP__"></script> <!-- timestamp is used to prevent caching -->
     <script src="chat.js?_t=__TIMESTAMP__"></script> <!-- timestamp is used to prevent caching -->
     <script>
         mermaid.initialize({startOnLoad:true});

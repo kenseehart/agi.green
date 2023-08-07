@@ -123,7 +123,6 @@ socket.onclose = function(event) {
     }
 };
 
-
 function autoResize() {
     this.style.height = 'inherit'; // Briefly shrink textarea to minimal size
     this.style.height = `${this.scrollHeight}px`; // Increase textarea height to its scroll-height
@@ -131,7 +130,3 @@ function autoResize() {
 
 document.getElementById('chat-input-text').addEventListener('input', autoResize);
 autoResize.call(document.getElementById('chat-input-text'));
-
-
-
-
