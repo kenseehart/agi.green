@@ -46,25 +46,49 @@ socket.addEventListener('open', (event) => {
     console.log('Connected to WS server');
 });
 
+userData = {};
+
 // Listen for messages from server
 socket.addEventListener('message', (event) => {
     //print the message to the console
     console.log('Message from server:', event.data);
-    //{"cmd": "append_chat", "content": "##hello world.", }
+    //{"cmd": "append_chat", "author": "21X5BDW0", "content": "##hello world.", }
 
     const msg = JSON.parse(event.data);
 
     console.log(msg);
 
-    if (msg.cmd === 'append_chat') {
+    if (msg.cmd === 'set_user_data') {
+        // Set the user's ID and username
+        userData[msg.uid] = msg;
+        console.log('userData:', userData);
+    }
+
+    else if (msg.cmd === 'append_chat') {
+        // Get the user's ID and username
+        const uid = msg.author;
+        const user = userData[uid];
+
         // Render markdown content
         const renderedHtml = md.render(msg.content);
 
         // Append to messages
         const messages = document.getElementById('messages');
+        const newMessageBlock = document.createElement('div');
         const newMessage = document.createElement('div');
-        newMessage.innerHTML = renderedHtml;
-        messages.appendChild(newMessage);
+        const avatarImage = document.createElement('img');
+        avatarImage.className = 'avatar';
+        avatarImage.src = `${user.icon}`;
+        avatarImage.alt = `${user.name}'s avatar`;
+        avatarImage.title = user.name; // for the mouse-over text
+
+        newMessage.className = 'chat-message';
+        newMessage.innerHTML += renderedHtml;
+        newMessageBlock.className = 'chat-message-block';
+        newMessageBlock.appendChild(avatarImage);
+        newMessageBlock.appendChild(newMessage);
+        messages.appendChild(newMessageBlock);
+
 
         // Initialize Mermaid for new elements
         mermaid.init(undefined, newMessage.querySelectorAll('.language-mermaid'));

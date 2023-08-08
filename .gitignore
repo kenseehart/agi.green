@@ -1,3 +1,7 @@
+# agi ignore
+data/
+static/avatars/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,5 +1,5 @@
-- ui: small button to right of chat input, fix scroll issue
-- avatar box next to each message
 - persistent data (avatar)
+- avatar box next to each message
 - info bot (avatar, name, color, upload image)
 - rabbitmq swarm
+- deploy on agi.green

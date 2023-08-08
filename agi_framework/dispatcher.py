@@ -118,6 +118,7 @@ class Protocol_http_ws:
         'Register websocket connection and wait for messages'
         self.ws_connected.add(websocket)
         try:
+            await self.ws_cmd_handlers['connect'](self)
             async for mesg in websocket:
                 data = json.loads(mesg)
                 await self.handle_ws_mesg(**data)

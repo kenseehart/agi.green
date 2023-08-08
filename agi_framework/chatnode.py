@@ -22,7 +22,12 @@ class ChatNode(Dispatcher, Protocol_mq, Protocol_http_ws):
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
         print(f'mq chat received: {author}: "{content}"')
-        await self.send_ws('append_chat', content=content)
+        await self.send_ws('append_chat', author='K12345', content=content)
+
+    async def on_ws_connect(self):
+        'handle new websocket connection'
+        print(f"ws connected: {self.ws_port}")
+        await self.send_ws('set_user_data', name='Ken Seehart', uid='K12345', icon='avatars/K12345.jpg')
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
