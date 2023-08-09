@@ -3,7 +3,7 @@ A user interface platform for python AI applications using docker and a browser 
 
 A high level python package controls all of the business logic, including asynchronous interaction with the ui.
 
-This is in very early development (2003).
+Please note: *This is in very early development (August 2003). The framework should be considered completely unstable for a few weeks, with no backward compatibility or versioning.*
 
 ## Components:
 
