@@ -38,7 +38,7 @@ class ChatNode(Dispatcher):
         await self.send_mq('chat', author=f'{self.name}', content=content)
 ```
 
-These are not predefined overloaded methods. You can add any methods that are prefixed with `on_{protocol}_{command}` with arbitrary named arguments, and these handler methods will autoregister. Send messages with `send_{protocol}(command, **kwargs)` with corresponding arguments. Predefined protocols are `ws` (socket connection to browser ui) and `mq` (amqp broadcast to peers, including echo to self)
+Note that `on_mq_chat` and `on_ws_chat_input` are not predefined overloaded methods. You can add any methods that are prefixed with `on_{protocol}_{command}` with arbitrary named arguments, and these handler methods will autoregister. Send messages with `send_{protocol}(command, **kwargs)` with corresponding arguments. The function signature defines the message protocol. Predefined protocols are `ws` (socket connection to browser ui) and `mq` (amqp broadcast to peers, including echo to self). Protocol `gpt` coming soon.
 
 ## Intended applications for this framework:
 
