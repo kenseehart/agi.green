@@ -1,16 +1,16 @@
 # agi.green
 A user interface platform for python AI applications using docker and a browser chat interface featuring markdown content. 
 
-A high level python package controls all of the business logic, including asynchronous interaction with the ui.
+A high level python package controls all of the business logic, including a unified message model and asynchronous interaction with the chat ui.
 
-Please note: *This is in very early development (August 2003). The framework should be considered completely unstable for a few weeks, with no backward compatibility or versioning.*
+**Please note:** *This is in very early development (August 2003). The framework should be considered completely unstable for a few weeks, with no backward compatibility or versioning.*
 
 ## Components:
 
-- docker: Peers are deployed as a docker containers
-- websockets: Communicate with browser ui
-- rabbit_mq: Communicate with other docker containers
-- markdown: Messages are rendered as markdown (and plugins such as mermaid and mathjax)
+- `docker`: Peers are deployed as a docker containers
+- `websockets`: Communicate with browser ui
+- `aio_pika`: Communicate via `AMQP` with other docker containers
+- `markdown`: Messages are rendered as markdown (and plugins such as mermaid and mathjax)
 
 ## Example chat room:
 
