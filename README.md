@@ -3,7 +3,7 @@ A user interface platform for python AI applications using docker and a browser 
 
 A high level python package controls all of the business logic, including a unified message model and asynchronous interaction with the chat ui.
 
-**Please note:** *This is in very early development (August 2003). The framework should be considered completely unstable for a few weeks, with no backward compatibility or versioning.*
+**Please note:** *This is in very early development (August 2003). The framework should be considered completely unstable for a few weeks, with no backward compatibility or versioning.* By September, we should be stable enough to support derivative works, and there will be a Github Template to facilitate deploying `agi.green` as a git submodule.
 
 ## Components:
 
