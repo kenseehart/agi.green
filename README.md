@@ -45,4 +45,7 @@ Note that `on_mq_chat` and `on_ws_chat_input` are not predefined overloaded meth
 - fish: fantastic imap sorting hat (conversational email sorting)
 - yara: yet another research assistant (interactively build an up to date expert on any topic)
 - various experiments in layered language models
-  
+
+-------------
+
+Copyright (c) 2023 Ken Seehart, AGI Green
