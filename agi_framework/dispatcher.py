@@ -2,6 +2,7 @@
 dispatcher
 '''
 
+import os
 import re
 import time
 import asyncio
@@ -16,6 +17,11 @@ from aiohttp import web
 # VScode debug port 5678
 # Browser port -p option (default=8000)
 # WebSocket port is browser port + 1 (default=8001)
+
+def format_call(cmd:str, kwargs:Dict[str, Any]) -> str:
+    'format command call for logging and debugging'
+    return f"{cmd}({', '.join([f'{k}={v}' for k,v in kwargs.items()])})"
+
 
 class DispatcherMeta(type):
     """Metaclass to handle method registration based on naming convention."""
@@ -55,12 +61,14 @@ class DispatcherMeta(type):
                 print (f'DispatcherMeta registered {proto}:close => {cls.__name__}.{key}(...)')
                 continue
 
+
 class Protocol_http_ws:
     '''
     Mixin class to handle http server and websocket connection
     Use port for http server
     Use port+1 for websocket port
     '''
+    protocol_id: str = 'ws'
 
     def __init__(self, port:int=8000, **kwargs):
         super().__init__(**kwargs)
@@ -71,11 +79,16 @@ class Protocol_http_ws:
         self.ws_port = port+1
         self.ws_connected = set()
         self.ws_cmd_handlers = self.registered_methods['ws']
+        self.md_content = None
+        self.substitutions = {
+            '__TIMESTAMP__': str(time.time()),
+        }
 
     async def arun_ws(self):
         # Serve static http content from index.html
         self.http_app = web.Application()
         self.http_app.router.add_get('/', self.handle_get_root_request)
+        self.http_app.router.add_get('/{path:.*}.md', self.handle_md_request)
         self.http_app.router.add_static('/', path='./static', name='static')
         self.http_runner = web.AppRunner(self.http_app)
         await self.http_runner.setup()
@@ -103,16 +116,39 @@ class Protocol_http_ws:
             await self.http_runner.cleanup()
 
     async def handle_get_root_request(self, request):
-        substitutions = {
-            '__TIMESTAMP__': str(time.time()),
-        }
+
 
         print(f'GET /')
         with open('./static/index.html', 'r') as file:
             content = file.read()
-            for key, value in substitutions.items():
+            for key, value in self.substitutions.items():
                 content = content.replace(key, value)
             return web.Response(text=content, content_type='text/html')
+
+    async def handle_md_request(self, request):
+        path = request.match_info['path']
+        file_path = os.path.join('./static', f"{path}.md")
+
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            with open(file_path, 'r') as f:
+                self.md_content = f.read()
+
+            with open('md_template.html', 'r') as template_file:
+                template = template_file.read()
+
+            for key, value in self.substitutions.items():
+                template = template.replace(key, value)
+
+            return web.Response(text=template, content_type='text/html')
+
+        # If the file doesn't exist, return a 404 Not Found
+        raise web.HTTPNotFound()
+
+    async def on_ws_request_md_content(self):
+        'request markdown content from browser via websocket'
+        if self.md_content is not None:
+            await self.send_ws('update_md_content', content=self.md_content)
+
 
     async def ws_handle_connection(self, websocket, path):
         'Register websocket connection and wait for messages'
@@ -121,6 +157,9 @@ class Protocol_http_ws:
             await self.ws_cmd_handlers['connect'](self)
             async for mesg in websocket:
                 data = json.loads(mesg)
+                if not 'cmd' in data:
+                    print(f"ws received invalid message: {data}")
+                    continue
                 await self.handle_ws_mesg(**data)
         finally:
             # Unregister websocket connection
@@ -137,10 +176,12 @@ class Protocol_http_ws:
         print(f"ws received: {cmd} {kwargs}")
         # call registered handler
         if cmd in self.ws_cmd_handlers:
-            await self.ws_cmd_handlers[cmd](self, **kwargs)
+            try:
+                await self.ws_cmd_handlers[cmd](self, **kwargs)
+            except Exception as e:
+                print(f"ws handler for '{format_call(cmd, kwargs)}' raised exception: {e}")
         else:
             print(f"no handler for ws cmd '{cmd}'")
-
 
 
 class Protocol_mq:

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Viewer</title>
+
+    <!-- timestamp is used to prevent caching. To allow caching, just don't substitute __TIMESTAMP__ -->
+    <link rel="stylesheet" href="agi-green.css?_t=__TIMESTAMP__" />
+</head>
+<body class="md-template-body">
+    <div id="md-button-container">
+        <button id="source-button" onclick="showSource()" class="button-unselected">
+            <img src="md-source.png" alt="Markdown Source">
+        </button>
+        <button id="render-button" onclick="showRendered()" class="button-selected">
+            <img src="md-render.png" alt="Markdown Rendered">
+        </button>
+    </div>
+
+    <div id="md-source">
+        <pre><code>loading...</code></pre>
+    </div>
+    <div id="md-render">
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@10/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/highlight.min.js"></script>
+
+    <link rel="stylesheet" href="agi-green.css?_t=__TIMESTAMP__" /> <!-- timestamp is used to prevent caching -->
+    <script src="agi-green.js?_t=__TIMESTAMP__"></script> <!-- timestamp is used to prevent caching -->
+</body>
+</html>
