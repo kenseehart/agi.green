@@ -38,7 +38,14 @@ class ChatNode(Dispatcher):
         await self.send_mq('chat', author=f'{self.name}', content=content)
 ```
 
-Note that `on_mq_chat` and `on_ws_chat_input` are not predefined overloaded methods. You can add any methods that are prefixed with `on_{protocol}_{command}` with arbitrary named arguments, and these handler methods will autoregister. Send messages with `send_{protocol}(command, **kwargs)` with corresponding arguments. The function signature defines the message schema. Predefined protocols are `ws` (socket connection to browser ui) and `mq` (amqp broadcast to peers, including echo to self). Protocol `gpt` coming soon. The framework provides for the definition of new protocols.
+Note that `on_mq_chat` and `on_ws_chat_input` are not predefined overloaded methods. You can add any methods you like named `on_{protocol}_{command}` with arbitrary named arguments, and these handler methods will autoregister. Send messages with `send_{protocol}(command, **kwargs)` with corresponding arguments. The function signature defines the message schema. Predefined protocols are `ws` (socket connection to browser ui) and `mq` (amqp broadcast to peers, including echo to self). Protocol `gpt` coming soon. The framework provides for the definition of new protocols.
+
+## Extensible Unified Protocol framework:
+
+Each protocol is a class that defines how to connect and send and receive messages.
+
+- **Configurable exception handling:** By default, errors while handling messages are caught and logged so the program can continue running.
+However, sometimes you want the exception to be unhandled, such as when debugging. You can disable exception handling with `exception=None` in the constructor of the protocol or the dispatcher.
 
 ## Intended applications for this framework:
 
