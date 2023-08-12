@@ -136,6 +136,7 @@ input[type="text"],
 
 #md-source {
     font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 10px;
 }
 
 .md-template-body {

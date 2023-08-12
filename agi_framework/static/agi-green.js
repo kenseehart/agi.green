@@ -35,10 +35,11 @@ function escapeHtml(text) {
         '<': '&lt;',
         '>': '&gt;',
         '"': '&quot;',
-        "'": '&#039;'
+        "'": '&#039;',
+        '\n': '<br>',
     };
 
-    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    return text.replace(/[&<>"'\n]/g, function(m) { return map[m]; });
 }
 
 // Connection opened
@@ -52,6 +53,24 @@ let wsHandlers = {};
 
 function wsRegisterHandlers(handlers) {
     wsHandlers = { ...wsHandlers, ...handlers };
+}
+
+function setTextWithNewlines(element, text) {
+    // First clear the current content
+    element.innerHTML = '';
+
+    // Split the text by newlines
+    let lines = text.split('\n');
+
+    // For each line, append a text node and a <br/> element
+    for(let i = 0; i < lines.length; i++) {
+        element.appendChild(document.createTextNode(lines[i]));
+
+        // Add a <br/> for each line except the last one
+        if(i !== lines.length - 1) {
+            element.appendChild(document.createElement('br'));
+        }
+    }
 }
 
 wsRegisterHandlers({
@@ -100,7 +119,7 @@ wsRegisterHandlers({
     'update_md_content': function(msg) {
         // Update the markdown content
         const mdSource = document.getElementById('md-source');
-        mdSource.textContent = msg.content;
+        setTextWithNewlines(mdSource, msg.content);
         autoResize.call(mdSource);
         const renderedContent = md.render(msg.content)
         const mdRendered = document.getElementById('md-render');
