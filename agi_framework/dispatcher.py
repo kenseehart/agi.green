@@ -126,6 +126,10 @@ class Protocol(metaclass=ProtocolDispatcherMeta):
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
 
+    def add_protocols(self, *protocols: "Protocol"):
+        for p in protocols:
+            self.add_protocol(p)
+
     def get_protocol(self, protocol_id: str) -> "Protocol":
         return self.root.registered_protocols[protocol_id]
 
@@ -165,10 +169,8 @@ class Dispatcher(Protocol):
     '''
     registed_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
-    def __init__(self, *protocols: Tuple[Protocol]):
+    def __init__(self):
         super().__init__()
-        for p in protocols:
-            self.add_protocol(p)
 
     def run(self):
         loop = asyncio.get_event_loop()

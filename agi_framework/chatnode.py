@@ -2,7 +2,6 @@ import sys
 import argparse
 from dispatcher import Dispatcher
 from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol
-#import ptvsd
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -18,10 +17,12 @@ class ChatNode(Dispatcher):
     '''
 
     def __init__(self, port:int=8000):
-        super().__init__(
+        super().__init__()
+
+        self.add_protocols(
             HTTPProtocol(port=port, nocache=True),
             WebSocketProtocol(port=port+1),
-            RabbitMQProtocol(host='localhost')
+            RabbitMQProtocol(host='localhost'),
         )
 
     async def on_mq_chat(self, author:str, content:str):
@@ -53,6 +54,8 @@ def main():
         return
 
     if args.debug:
+        import ptvsd
+
         print("Enabling debug attach...")
         ptvsd.enable_attach(address=('0.0.0.0', '5678'))
 
