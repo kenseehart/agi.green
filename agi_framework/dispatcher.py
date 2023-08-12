@@ -2,261 +2,173 @@
 dispatcher
 '''
 
-import os
 import re
-import time
 import asyncio
 from collections import defaultdict
-from typing import Callable, Awaitable, Dict, Any, List, Optional, Union
-import json
-import websockets
-import aio_pika
-from aiohttp import web
+from typing import Callable, Awaitable, Dict, Any, Tuple, List
+from types import MethodType
 
-# RabbitMQ port 5672
-# VScode debug port 5678
-# Browser port -p option (default=8000)
-# WebSocket port is browser port + 1 (default=8001)
+def trunc_repr(value:Any, max_len:int=30) -> str:
+    'repr() with truncation approximatly to max_len'
+    r = repr(value)
+    if len(r) <= max_len:
+        return r
+
+    item_max_len = (max_len+8) // 2
+
+    match value:
+        case int():
+            return repr(value)
+        case float():
+            return f'{value:1.3f}'
+        case str():
+            return repr(value[:max_len] + '...')
+        case list():
+            if len(value) > 3:
+                value = value[:3] + [...]
+            return f'[{", ".join([trunc_repr(v, item_max_len) for v in value[:3]])}]'
+        case tuple():
+            if len(value) > 3:
+                value = value[:3] + (...,)
+            return f'({", ".join([trunc_repr(v, item_max_len) for v in value])})'
+        case dict():
+            items = [f"{trunc_repr(k, item_max_len)}: {trunc_repr(v, item_max_len)}" for k, v in value.items()]
+            if len(items) > 2:
+                items = items[:2] + ['...']
+            return f'{{{", ".join(items)}}}'
+        case _:
+            return f'{r[:max_len]}...'
+
 
 def format_call(cmd:str, kwargs:Dict[str, Any]) -> str:
     'format command call for logging and debugging'
-    return f"{cmd}({', '.join([f'{k}={v}' for k,v in kwargs.items()])})"
+    return f"{cmd}({', '.join([f'{k}={trunc_repr(v)}' for k,v in kwargs.items()])})"
 
+def format_method(method: MethodType) -> str:
+    'format method for logging, debugging, and docs'
+    args = ', '.join(method.__code__.co_varnames[:method.__code__.co_argcount])
+    return f"{method.__qualname__}({args})"
 
-class DispatcherMeta(type):
-    """Metaclass to handle method registration based on naming convention."""
+class ProtocolDispatcherMeta(type):
+    """Metaclass for protocols and dispatchers."""
 
-    registed_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
     re_on_cmd = re.compile(r'^on_(\w+?)_(\w+)$')
-    re_arun = re.compile(r'^arun_(\w+)$')
-    re_close = re.compile(r'^close_(\w+)$')
 
     def __init__(cls, name, bases, attrs):
         super().__init__(name, bases, attrs)
 
         # Initialize the registry for the class
-        cls.registered_methods = defaultdict(dict)
-        cls.registered_aruns = []
-        cls.registered_closes = []
+        cls._registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]] = defaultdict(dict)
 
         # Register methods with the "on_" prefix
         for key in dir(cls):
             method = getattr(cls, key)
-            m = DispatcherMeta.re_on_cmd.match(key)
+            m = cls.re_on_cmd.match(key)
             if m:
                 proto, cmd = m.groups()
-                cls.registered_methods[proto][cmd] = method
-                print (f'DispatcherMeta registered {proto}:{cmd} => {cls.__name__}.{key}(...)')
-                continue
-            m = DispatcherMeta.re_arun.match(key)
-            if m:
-                proto = m.groups()[0]
-                cls.registered_aruns.append(method)
-                print (f'DispatcherMeta registered {proto}:arun => {cls.__name__}.{key}(...)')
-                continue
-            m = DispatcherMeta.re_close.match(key)
-            if m:
-                proto = m.groups()[0]
-                cls.registered_closes.append(method)
-                print (f'DispatcherMeta registered {proto}:close => {cls.__name__}.{key}(...)')
+                cls._registered_methods[proto][cmd] = method
+                print (f'Registered {proto}:{cmd} => {format_method(method)}')
                 continue
 
+class Protocol(metaclass=ProtocolDispatcherMeta):
+    _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
-class Protocol_http_ws:
-    '''
-    Mixin class to handle http server and websocket connection
-    Use port for http server
-    Use port+1 for websocket port
-    '''
-    protocol_id: str = 'ws'
+    protocol_id: str = ''
 
-    def __init__(self, port:int=8000, **kwargs):
-        super().__init__(**kwargs)
-        self.http_port = port
-        self.http_app:web.Application = None
-        self.http_runner:web.AppRunner = None
-        self.http_site:web.TCPSite = None
-        self.ws_port = port+1
-        self.ws_connected = set()
-        self.ws_cmd_handlers = self.registered_methods['ws']
-        self.md_content = None
-        self.substitutions = {
-            '__TIMESTAMP__': str(time.time()),
-        }
+    def __init__(self):
+        super().__init__()
+        self.parent: 'Protocol' = None
+        self.children: List['Protocol'] = []
+        self.exception = Exception
+        self._registered_methods_cache = None
+        self._registered_protocols_cache = None
 
-    async def arun_ws(self):
-        # Serve static http content from index.html
-        self.http_app = web.Application()
-        self.http_app.router.add_get('/', self.handle_get_root_request)
-        self.http_app.router.add_get('/{path:.*}.md', self.handle_md_request)
-        self.http_app.router.add_static('/', path='./static', name='static')
-        self.http_runner = web.AppRunner(self.http_app)
-        await self.http_runner.setup()
-        self.http_site = web.TCPSite(self.http_runner, '0.0.0.0', self.http_port)
-        await websockets.serve(self.ws_handle_connection, '0.0.0.0', self.ws_port)
-        await self.http_site.start()
+    def __repr__(self):
+        r =  self.__class__.__name__
+        if self.protocol_id:
+            r += f':{self.protocol_id}'
 
-    async def close_ws(self):
-        # Close all WebSocket connections
-        for ws in self.ws_connected:
-            await ws.close()
-        self.ws_connected.clear()
+    @property
+    def root(self):
+        'Return root protocol (dispatcher)'
+        return self.parent.root if self.parent else self
 
-        # Stop the aiohttp site
-        if self.http_site:
-            await self.http_site.stop()
+    @property
+    def all_children(self) -> List['Protocol']:
+        'Return all children of this protocol'
+        return self.children + [c for p in self.children for c in p.all_children]
 
-        # Shutdown and cleanup the aiohttp app
-        if self.http_app:
-            await self.http_app.shutdown()
-            await self.http_app.cleanup()
+    @property
+    def registered_methods(self) -> Dict[str, Dict[str, Callable[..., Awaitable[None]]]]:
+        'Return all registered methods for this protocol and its children'
+        if self._registered_methods_cache is None:
+            self._registered_methods_cache = defaultdict(dict)
+            for p in self.children:
+                for proto, methods in p.registered_methods.items():
+                    self._registered_methods_cache[proto].update(methods)
+            for proto, methods in self._registered_methods.items():
+                self._registered_methods_cache[proto].update(methods)
+        return self._registered_methods_cache
 
-        # Finally, cleanup the AppRunner
-        if self.http_runner:
-            await self.http_runner.cleanup()
+    @property
+    def registered_protocols(self) -> Dict[str, 'Protocol']:
+        'Return all registered protocols for this protocol and its children'
+        if self._registered_protocols_cache is None:
+            self._registered_protocols_cache = {}
+            for p in self.children:
+                self._registered_protocols_cache[p.protocol_id] = p
+                self._registered_protocols_cache.update(p.registered_protocols)
+        return self._registered_protocols_cache
 
-    async def handle_get_root_request(self, request):
+    def add_protocol(self, protocol: "Protocol"):
+        protocol.parent = self
+        self.children.append(protocol)
+        self._registered_methods_cache = None
+        self._registered_protocols_cache = None
 
+    def get_protocol(self, protocol_id: str) -> "Protocol":
+        return self.root.registered_protocols[protocol_id]
 
-        print(f'GET /')
-        with open('./static/index.html', 'r') as file:
-            content = file.read()
-            for key, value in self.substitutions.items():
-                content = content.replace(key, value)
-            return web.Response(text=content, content_type='text/html')
+    def catch_exception(self, exception: Exception):
+        self.exception = exception
 
-    async def handle_md_request(self, request):
-        path = request.match_info['path']
-        file_path = os.path.join('./static', f"{path}.md")
+    async def arun(self):
+        raise NotImplementedError(f'{self.__class__.__name__}.arun() not implemented')
 
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            with open(file_path, 'r') as f:
-                self.md_content = f.read()
+    async def aclose(self):
+        pass
 
-            with open('md_template.html', 'r') as template_file:
-                template = template_file.read()
-
-            for key, value in self.substitutions.items():
-                template = template.replace(key, value)
-
-            return web.Response(text=template, content_type='text/html')
-
-        # If the file doesn't exist, return a 404 Not Found
-        raise web.HTTPNotFound()
-
-    async def on_ws_request_md_content(self):
-        'request markdown content from browser via websocket'
-        if self.md_content is not None:
-            await self.send_ws('update_md_content', content=self.md_content)
-
-
-    async def ws_handle_connection(self, websocket, path):
-        'Register websocket connection and wait for messages'
-        self.ws_connected.add(websocket)
-        try:
-            await self.ws_cmd_handlers['connect'](self)
-            async for mesg in websocket:
-                data = json.loads(mesg)
-                if not 'cmd' in data:
-                    print(f"ws received invalid message: {data}")
-                    continue
-                await self.handle_ws_mesg(**data)
-        finally:
-            # Unregister websocket connection
-            self.ws_connected.remove(websocket)
-
-    async def send_ws(self, cmd:str, **kwargs):
-        'send message to browser via websocket'
-        kwargs['cmd'] = cmd
-        for ws in self.ws_connected:
-            await ws.send(json.dumps(kwargs))
-
-    async def handle_ws_mesg(self, cmd:str, **kwargs):
-        'receive message from browser via websocket - overload this method'
-        print(f"ws received: {cmd} {kwargs}")
+    async def handle_mesg(self, cmd:str, **kwargs):
+        'receive message from any protocol and dispatch to registered handler'
+        print(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
         # call registered handler
-        if cmd in self.ws_cmd_handlers:
-            try:
-                await self.ws_cmd_handlers[cmd](self, **kwargs)
-            except Exception as e:
-                print(f"ws handler for '{format_call(cmd, kwargs)}' raised exception: {e}")
+        cmd_handlers = self.root.registered_methods[self.protocol_id]
+
+        if cmd in cmd_handlers:
+            await cmd_handlers[cmd](self, **kwargs)
         else:
-            print(f"no handler for ws cmd '{cmd}'")
+            print(f"no handler for {self.protocol_id}:{cmd}")
 
+    async def send(self, protocol_id, cmd:str, **kwargs):
+        'send message via specified protocol'
+        print(f'sending: {self.protocol_id}:{format_call(cmd, kwargs)}')
+        await self.root.get_protocol(protocol_id).do_send(cmd, **kwargs)
 
-class Protocol_mq:
+    async def do_send(self, cmd:str, **kwargs):
+        'override to implement send'
+        raise NotImplementedError(f'{self.__class__.__name__}.do_send() not implemented')
+
+class Dispatcher(Protocol):
     '''
-    Mixin class to handle RabbitMQ broadcast protocol
+    Base class for dispatchers
+    Manages connections and messaging via protocols
     '''
-
     registed_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.mq_connection: aio_pika.Connection = None
-        self.mq_channel: aio_pika.Channel = None
-        self.mq_exchange: aio_pika.Exchange = None
-        self.mq_queue: aio_pika.Queue = None
-        self.mq_cmd_handlers = self.registered_methods['mq']
-
-    async def arun_mq(self):
-        try:
-            self.mq_connection = await aio_pika.connect_robust("amqp://guest:guest@rabbitmq/")
-        except aio_pika.AMQPException as e:
-            print(f"RabbitMQ connection failed: {e}")
-            return
-
-        self.mq_channel = await self.mq_connection.channel()
-
-        # Declare a fanout exchange
-        self.mq_exchange = await self.mq_channel.declare_exchange('chat', aio_pika.ExchangeType.FANOUT)
-
-        # Declare a queue with a random name, exclusive to this connection
-        self.mq_queue = await self.mq_channel.declare_queue(exclusive=True)
-
-        # Bind the queue to the exchange, to receive all messages
-        await self.mq_queue.bind(self.mq_exchange)
-        await self.receive_mq_mesg(),
-
-    async def close_mq(self):
-        # Close the RabbitMQ channel and connection
-        if self.mq_channel:
-            await self.mq_channel.close()
-            await self.mq_connection.close()
-
-    async def send_mq(self, cmd:str, **kwargs):
-        'broadcast message to RabbitMQ'
-        kwargs['cmd'] = cmd
-        await self.mq_exchange.publish(
-            aio_pika.Message(body=json.dumps(kwargs).encode()),
-            routing_key='',  # ignored for fanout exchanges
-        )
-
-    async def receive_mq_mesg(self):
-        'receive messages from RabbitMQ'
-        async with self.mq_queue.iterator() as queue_iter:
-            async for message in queue_iter:
-                async with message.process():
-                    await self.handle_mq_mesg(**json.loads(message.body.decode()))
-
-    async def handle_mq_mesg(self, cmd:str, **kwargs):
-        'receive message from RabbitMQ - overload this method'
-        print('mq received: {kwargs}')
-        # call registered handler
-        if cmd in self.mq_cmd_handlers:
-            await self.mq_cmd_handlers[cmd](self, **kwargs)
-        else:
-            print(f"no handler for mq cmd '{cmd}'")
-
-
-
-class Dispatcher(metaclass=DispatcherMeta):
-    '''
-    Manages the connection to RabbitMQ and WebSocket connection to browser.
-    '''
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *protocols: Tuple[Protocol]):
+        super().__init__()
+        for p in protocols:
+            self.add_protocol(p)
 
     def run(self):
         loop = asyncio.get_event_loop()
@@ -266,15 +178,15 @@ class Dispatcher(metaclass=DispatcherMeta):
             print (e)
             raise
         finally:
-            loop.run_until_complete(self.close())
+            loop.run_until_complete(self.aclose())
             loop.close()
 
     async def arun(self):
         # Run all registered async run methods in parallel
-        await asyncio.gather(*(m(self) for m in self.registered_aruns))
+        await asyncio.gather(*(p.arun() for p in self.children))
 
-    async def close(self):
+    async def aclose(self):
         # Run all registered async close methods in parallel
-        await asyncio.gather(*(m(self) for m in self.registered_closes))
+        await asyncio.gather(*(p.aclose() for p in self.children))
 
 
