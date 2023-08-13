@@ -2,11 +2,22 @@
 dispatcher
 '''
 
+import sys
 import re
 import asyncio
 from collections import defaultdict
 from typing import Callable, Awaitable, Dict, Any, Tuple, List
 from types import MethodType
+import logging
+
+if '-D' in sys.argv:
+    log_format = '%(name)s - %(levelname)s - %(message)s'
+else:
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+logging.basicConfig(level=logging.INFO, format=log_format)
+
+logger = logging.getLogger(__name__)
 
 def trunc_repr(value:Any, max_len:int=30) -> str:
     'repr() with truncation approximatly to max_len'
@@ -67,7 +78,7 @@ class ProtocolDispatcherMeta(type):
             if m:
                 proto, cmd = m.groups()
                 cls._registered_methods[proto][cmd] = method
-                print (f'Registered {proto}:{cmd} => {format_method(method)}')
+                logger.info(f'Registered {proto}:{cmd} => {format_method(method)}')
                 continue
 
 class Protocol(metaclass=ProtocolDispatcherMeta):
@@ -87,6 +98,7 @@ class Protocol(metaclass=ProtocolDispatcherMeta):
         r =  self.__class__.__name__
         if self.protocol_id:
             r += f':{self.protocol_id}'
+        return r
 
     @property
     def root(self):
@@ -139,23 +151,23 @@ class Protocol(metaclass=ProtocolDispatcherMeta):
     async def arun(self):
         raise NotImplementedError(f'{self.__class__.__name__}.arun() not implemented')
 
-    async def aclose(self):
+    async def close(self):
         pass
 
     async def handle_mesg(self, cmd:str, **kwargs):
         'receive message from any protocol and dispatch to registered handler'
-        print(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
+        logger.info(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
         # call registered handler
         cmd_handlers = self.root.registered_methods[self.protocol_id]
 
         if cmd in cmd_handlers:
             await cmd_handlers[cmd](self, **kwargs)
         else:
-            print(f"no handler for {self.protocol_id}:{cmd}")
+            logger.warn(f"no handler for {self.protocol_id}:{cmd}")
 
     async def send(self, protocol_id, cmd:str, **kwargs):
         'send message via specified protocol'
-        print(f'sending: {self.protocol_id}:{format_call(cmd, kwargs)}')
+        logger.info(f'sending: {self.protocol_id}:{format_call(cmd, kwargs)}')
         await self.root.get_protocol(protocol_id).do_send(cmd, **kwargs)
 
     async def do_send(self, cmd:str, **kwargs):
@@ -167,8 +179,6 @@ class Dispatcher(Protocol):
     Base class for dispatchers
     Manages connections and messaging via protocols
     '''
-    registed_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
-
     def __init__(self):
         super().__init__()
 
@@ -177,7 +187,7 @@ class Dispatcher(Protocol):
         try:
             loop.run_until_complete(self.arun())
         except Exception as e:
-            print (e)
+            logger.error(e)
             raise
         finally:
             loop.run_until_complete(self.aclose())

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  chat-app:
+    build: .
+    image: chat-app
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "5678:5678"
+    command: ["python", "-u", "chatnode.py"]
+    networks:
+      - mynetwork
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+
+  chat-debug:
+    build: .
+    image: chat-app
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "5678:5678"
+    command: ["python", "-u", "chatnode.py", "-d"]
+    networks:
+      - mynetwork
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:latest
+    networks:
+      - mynetwork
+    ports:
+      - "5672:5672"
+
+networks:
+  mynetwork:
+    driver: bridge

@@ -8,13 +8,14 @@ import time
 import asyncio
 from collections import defaultdict
 from typing import Callable, Awaitable, Dict, Any, List, Set
+from logging import getLogger, Logger
 import json
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
 import aio_pika
 from aiohttp import web
 
-from dispatcher import Dispatcher, Protocol, format_call
+from dispatcher import Dispatcher, Protocol, format_call, logger
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -34,7 +35,7 @@ class WebSocketProtocol(Protocol):
     async def arun(self):
         await websockets.serve(self.handle_connection, '0.0.0.0', self.port)
 
-    async def close(self):
+    async def aclose(self):
         # Close all WebSocket connections
         for ws in self.connected:
             await ws.close()
@@ -91,7 +92,7 @@ class HTTPProtocol(Protocol):
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
         await self.site.start()
 
-    async def close(self):
+    async def aclose(self):
         # Stop the aiohttp site
         if self.site:
             await self.site.stop()
@@ -106,7 +107,7 @@ class HTTPProtocol(Protocol):
             await self.runner.cleanup()
 
     async def handle_get_root_request(self, request):
-        print(f'GET /')
+        logger.info(f'GET /')
         with open('./static/index.html', 'r') as file:
             content = file.read()
             for key, value in self.substitutions.items():
@@ -116,10 +117,16 @@ class HTTPProtocol(Protocol):
     async def handle_md_request(self, request):
         path = request.match_info['path']
         file_path = os.path.join('./static', f"{path}.md")
+        format = request.query.get('format', 'render')
 
         if os.path.exists(file_path) and os.path.isfile(file_path):
             with open(file_path, 'r') as f:
                 self.md_content = f.read()
+
+            self.md_format = format
+
+            if format == 'text':
+                return web.Response(text=self.md_content, content_type='text/plain')
 
             with open('md_template.html', 'r') as template_file:
                 template = template_file.read()
@@ -137,7 +144,7 @@ class HTTPProtocol(Protocol):
         http = self.get_protocol('http')
 
         if http.md_content is not None:
-            await self.send('ws', 'update_md_content', content=http.md_content)
+            await self.send('ws', 'update_md_content', content=http.md_content, format=http.md_format)
 
 
 
@@ -159,9 +166,10 @@ class RabbitMQProtocol(Protocol):
 
     async def arun(self):
         try:
+            logger.info(f'Connecting to RabbitMQ on {self.host}:{self.port}')
             self.connection = await aio_pika.connect_robust(host=self.host, port=self.port)
         except aio_pika.AMQPException as e:
-            print(f"RabbitMQ connection failed: {e}")
+            logger.error(f"RabbitMQ connection failed: {e}")
             return
 
         self.channel = await self.connection.channel()
@@ -176,7 +184,7 @@ class RabbitMQProtocol(Protocol):
         await self.queue.bind(self.exchange)
         await self.receive_mq_mesg(),
 
-    async def close(self):
+    async def aclose(self):
         # Close the RabbitMQ channel and connection
         if self.channel:
             await self.channel.close()

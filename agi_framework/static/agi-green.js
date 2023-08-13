@@ -125,6 +125,15 @@ wsRegisterHandlers({
         const mdRendered = document.getElementById('md-render');
         mdRendered.innerHTML = renderedContent;
         autoResize.call(mdRendered);
+        mermaid.init(undefined, mdRendered.querySelectorAll('.language-mermaid'));
+        window.MathJax.typesetPromise([mdRendered]);
+
+        if (msg.format === 'source') {
+            showSource();
+        }
+        else {
+            showRendered();
+        }
     }
 });
 

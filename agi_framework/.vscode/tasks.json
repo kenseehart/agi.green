@@ -4,7 +4,7 @@
         {
             "label": "build_and_run",
             "type": "shell",
-            "command": "docker build -t chat-app . ; docker run -it -d -p 8000:8000 --network mynetwork --name chat-run chat-app-8000 python -u chatnode.py",
+            "command": "docker-compose up -d chat-app",
             "isBackground": true,
             "group": {
                 "kind": "build",
@@ -24,7 +24,7 @@
         {
             "label": "build_and_run_for_debug",
             "type": "shell",
-            "command": "docker build -t chat-app . ; docker run -it -d -p8000:8000 -p8001:8001 -p 5678:5678 --network mynetwork --name chat-debug-8000 chat-app python -u chatnode.py -d",
+            "command": "docker-compose up -d chat-debug",
             "isBackground": true,
             "group": {
                 "kind": "build",
@@ -54,6 +54,5 @@
             "dependsOn": ["build_and_run_for_debug", "wait_for_port"],
             "problemMatcher": []
         }
-
     ]
 }

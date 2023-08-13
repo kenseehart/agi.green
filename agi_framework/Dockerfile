@@ -11,6 +11,5 @@ EXPOSE 5678
 EXPOSE 8000
 EXPOSE 8001
 EXPOSE 5672
-5672
 
-CMD [ "python", "-u", "-m", "app" ]
+CMD [ "python", "-u", "-m", "app", "-d", "-D" ]
