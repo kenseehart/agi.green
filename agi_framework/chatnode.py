@@ -2,7 +2,8 @@ import os
 import sys
 import argparse
 from dispatcher import Dispatcher, logger
-from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol
+from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol
+from config import Config
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -15,33 +16,42 @@ class ChatNode(Dispatcher):
     handler methods are named on_<protocol>_<cmd> where protocol is mq or ws
     mq = RabbitMQ
     ws = WebSocket
+    gtp = OpenAI Rest API
     '''
 
     def __init__(self, port:int=8000, rabbitmq_host:str='localhost'):
         super().__init__()
+        self.port = port
+        self.config = Config('agi_config.yaml', 'agi_config_default.yaml')
+
+        self.http = HTTPProtocol(port=port, nocache=True)
+        self.ws = WebSocketProtocol(port=port+1)
+        self.mq = RabbitMQProtocol(host=rabbitmq_host)
+        self.gpt = GPTChatProtocol(self.config)
 
         self.add_protocols(
-            HTTPProtocol(port=port, nocache=True),
-            WebSocketProtocol(port=port+1),
-            RabbitMQProtocol(host=rabbitmq_host),
+            self.http,
+            self.ws,
+            self.mq,
+            self.gpt,
         )
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
-        logger.info(f'mq chat received: {author}: "{content}"')
-        await self.send('ws', 'append_chat', author='K12345', content=content)
+        await self.send('ws', 'append_chat', author=author, content=content)
 
     async def on_ws_connect(self):
         'handle new websocket connection'
-        logger.info(f"ws connected: {self.port}")
         await self.send('ws', 'set_user_data', name='Ken Seehart', uid='K12345', icon='avatars/K12345.jpg')
+        await self.send('ws', 'set_user_data', name='agi.green', uid='bot', icon='avatars/bot.png')
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
-        logger.info(f"ws chat input: '{content}'")
-
         # broadcast to all (including sender, which will echo back to browser)
-        await self.send('mq', 'chat', author=f'{self.port}', content=content)
+        await self.send('mq', 'chat', author=f'K12345', content=content)
+
+
+
 
 def main():
     default_rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')

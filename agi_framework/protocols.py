@@ -3,19 +3,22 @@ implementation of ws, mq and http protocols
 '''
 
 import os
-import re
 import time
-import asyncio
-from collections import defaultdict
+import shutil
+import yaml
 from typing import Callable, Awaitable, Dict, Any, List, Set
 from logging import getLogger, Logger
 import json
+import asyncio
+
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
 import aio_pika
 from aiohttp import web
+import openai
 
-from dispatcher import Dispatcher, Protocol, format_call, logger
+from dispatcher import Protocol, format_call, logger
+from config import Config
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -24,6 +27,7 @@ from dispatcher import Dispatcher, Protocol, format_call, logger
 
 class WebSocketProtocol(Protocol):
     '''
+    Websocket server
     '''
     protocol_id: str = 'ws'
 
@@ -62,7 +66,7 @@ class WebSocketProtocol(Protocol):
 
 class HTTPProtocol(Protocol):
     '''
-    Mixin class to handle http server and websocket connection
+    http server
     Use port for http server
     Use port+1 for websocket port
     '''
@@ -147,10 +151,9 @@ class HTTPProtocol(Protocol):
             await self.send('ws', 'update_md_content', content=http.md_content, format=http.md_format)
 
 
-
 class RabbitMQProtocol(Protocol):
     '''
-    Mixin class to handle RabbitMQ broadcast protocol
+    RabbitMQ broadcast protocol
     '''
 
     protocol_id: str = 'mq'
@@ -207,7 +210,79 @@ class RabbitMQProtocol(Protocol):
                     await self.handle_mesg(**data)
 
 
+openai_key_request = '''
+OpenAI API key required for GPT-4 chat mode.
+
+``` form
+fields:
+  - type: text
+    label: OpenAI API key
+    key: openai.key
+```
+'''
 
 
+class GPTChatProtocol(Protocol):
+    '''
+    OpenAI GPT Chat protocol
 
+    This is just a POC: simple async wrapper around the OpenAI API in chat mode.
+    Next step is to implement HuggingFace transformers and langchain for more control.
+    '''
+    protocol_id: str = 'gpt'
+
+    def __init__(self, config:Config, **kwargs):
+        super().__init__(**kwargs)
+        self.config = config
+        self.name = 'agi.green'
+        self.uid = 'bot'
+
+    async def arun(self):
+        # Ensure the OpenAI client is authenticated
+        api_key = self.config.get('openai.key')
+        self.messages = [
+            {"role": "system", "content": "You are a helpful assistant representing agi.green."},
+        ]
+
+        if api_key:
+            openai.api_key = api_key
+        else:
+            logger.warn('Missing OpenAI API key in config')
+            # request api key
+            asyncio.create_task(self.request_key())
+
+    async def request_key(self):
+        'request api key from browser'
+        await self.send('mq', 'chat', author=self.name, content=openai_key_request)
+
+    async def on_ws_form_data(self, cmd:str, data:dict):
+        key = data.get('key')
+        openai.api_key = key
+        self.config.set('openai.key', key)
+        self.messages.append({"role": "system", "content": "OpenAI API key was just now set by the user."})
+        await self.get_completion()
+
+    async def on_mq_chat(self, author:str, content:str):
+        'receive chat message from RabbitMQ'
+        if author != self.uid:
+            self.messages.append({"role": "user", "content": content})
+            # Schedule the synchronous OpenAI call to run in a thread executor
+            task = asyncio.create_task(self.get_completion())
+
+    async def get_completion(self):
+        loop = asyncio.get_event_loop()
+        content = await loop.run_in_executor(None, self.sync_completion)
+        await self.send('mq', 'chat', author=self.uid, content=content)
+
+    def sync_completion(self):
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=self.messages,
+                )
+            return response.choices[0]['message']['content']
+        except Exception as e:
+            msg = f'OpenAI API error: {e}'
+            logger.error(msg)
+            return f'<span style="color:red">{msg}</span>'
 

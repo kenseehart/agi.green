@@ -60,28 +60,8 @@ def format_method(method: MethodType) -> str:
     args = ', '.join(method.__code__.co_varnames[:method.__code__.co_argcount])
     return f"{method.__qualname__}({args})"
 
-class ProtocolDispatcherMeta(type):
-    """Metaclass for protocols and dispatchers."""
 
-    re_on_cmd = re.compile(r'^on_(\w+?)_(\w+)$')
-
-    def __init__(cls, name, bases, attrs):
-        super().__init__(name, bases, attrs)
-
-        # Initialize the registry for the class
-        cls._registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]] = defaultdict(dict)
-
-        # Register methods with the "on_" prefix
-        for key in dir(cls):
-            method = getattr(cls, key)
-            m = cls.re_on_cmd.match(key)
-            if m:
-                proto, cmd = m.groups()
-                cls._registered_methods[proto][cmd] = method
-                logger.info(f'Registered {proto}:{cmd} => {format_method(method)}')
-                continue
-
-class Protocol(metaclass=ProtocolDispatcherMeta):
+class Protocol:
     _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
     protocol_id: str = ''
@@ -100,6 +80,27 @@ class Protocol(metaclass=ProtocolDispatcherMeta):
             r += f':{self.protocol_id}'
         return r
 
+    def _register_methods(self):
+        'Register methods for a protocol'
+        registry = self.root._registered_methods_cache
+        re_on_cmd = re.compile(r'^on_(\w+?)_(\w+)$')
+
+        # Register methods for children
+        for ch in self.children:
+            ch._register_methods()
+
+        # Register methods with the "on_" prefix
+        for key in dir(self.__class__):
+            m = re_on_cmd.match(key)
+            if m:
+                method = getattr(self, key)
+                if isinstance(method, MethodType):
+                    proto, cmd = m.groups()
+                    if method not in registry[proto][cmd]:
+                        registry[proto][cmd].append(method)
+                        logger.info(f'Registered {proto}:{cmd} => {format_method(method)}')
+
+
     @property
     def root(self):
         'Return root protocol (dispatcher)'
@@ -114,12 +115,8 @@ class Protocol(metaclass=ProtocolDispatcherMeta):
     def registered_methods(self) -> Dict[str, Dict[str, Callable[..., Awaitable[None]]]]:
         'Return all registered methods for this protocol and its children'
         if self._registered_methods_cache is None:
-            self._registered_methods_cache = defaultdict(dict)
-            for p in self.children:
-                for proto, methods in p.registered_methods.items():
-                    self._registered_methods_cache[proto].update(methods)
-            for proto, methods in self._registered_methods.items():
-                self._registered_methods_cache[proto].update(methods)
+            self._registered_methods_cache = defaultdict(lambda: defaultdict(list))
+            self._register_methods()
         return self._registered_methods_cache
 
     @property
@@ -151,28 +148,38 @@ class Protocol(metaclass=ProtocolDispatcherMeta):
     async def arun(self):
         raise NotImplementedError(f'{self.__class__.__name__}.arun() not implemented')
 
+    async def aclose(self):
+        pass
+
     async def close(self):
         pass
 
     async def handle_mesg(self, cmd:str, **kwargs):
         'receive message from any protocol and dispatch to registered handler'
         logger.info(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
-        # call registered handler
-        cmd_handlers = self.root.registered_methods[self.protocol_id]
 
-        if cmd in cmd_handlers:
-            await cmd_handlers[cmd](self, **kwargs)
+        # call registered handler
+        cmd_handlers = self.root.registered_methods[self.protocol_id][cmd]
+
+        if cmd_handlers:
+            for handler in cmd_handlers:
+                try:
+                    await handler(**kwargs)
+                except self.exception as e:
+                    logger.error(e)
+                    raise
         else:
             logger.warn(f"no handler for {self.protocol_id}:{cmd}")
 
     async def send(self, protocol_id, cmd:str, **kwargs):
         'send message via specified protocol'
-        logger.info(f'sending: {self.protocol_id}:{format_call(cmd, kwargs)}')
+        logger.info(f'sending: {protocol_id}:{format_call(cmd, kwargs)}')
         await self.root.get_protocol(protocol_id).do_send(cmd, **kwargs)
 
-    async def do_send(self, cmd:str, **kwargs):
-        'override to implement send'
-        raise NotImplementedError(f'{self.__class__.__name__}.do_send() not implemented')
+    async def do_send(self, cmd: str, **kwargs):
+        'default: send request to self - override to implement a protocol specific send'
+        return await self.handle_mesg(cmd, **kwargs)
+
 
 class Dispatcher(Protocol):
     '''
