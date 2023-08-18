@@ -142,3 +142,8 @@ input[type="text"],
 .md-template-body {
     padding: 20px;
 }
+
+th, td {
+    border: 1px solid #034905;
+    padding: 8px;
+  }

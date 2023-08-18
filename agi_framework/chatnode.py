@@ -17,6 +17,8 @@ class ChatNode(Dispatcher):
     mq = RabbitMQ
     ws = WebSocket
     gtp = OpenAI Rest API
+
+    This represents a single connection to a browser for one user.
     '''
 
     def __init__(self, port:int=8000, rabbitmq_host:str='localhost'):
