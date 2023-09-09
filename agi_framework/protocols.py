@@ -72,8 +72,9 @@ class HTTPProtocol(Protocol):
     '''
     protocol_id: str = 'http'
 
-    def __init__(self, port:int=8000, nocache=False, **kwargs):
+    def __init__(self, root:str, port:int=8000, nocache=False, **kwargs):
         super().__init__(**kwargs)
+        self.root = root
         self.port = port
         self.app:web.Application = None
         self.runner:web.AppRunner = None
@@ -90,7 +91,7 @@ class HTTPProtocol(Protocol):
         self.app = web.Application()
         self.app.router.add_get('/', self.handle_get_root_request)
         self.app.router.add_get('/{path:.*}.md', self.handle_md_request)
-        self.app.router.add_static('/', path='./static', name='static')
+        self.app.router.add_static('/', path=os.path.join(self.root, 'static'), name='static')
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
@@ -112,7 +113,7 @@ class HTTPProtocol(Protocol):
 
     async def handle_get_root_request(self, request):
         logger.info(f'GET /')
-        with open('./static/index.html', 'r') as file:
+        with open(os.path.join(self.root, 'static/index.html'), 'r') as file:
             content = file.read()
             for key, value in self.substitutions.items():
                 content = content.replace(key, value)
@@ -120,7 +121,7 @@ class HTTPProtocol(Protocol):
 
     async def handle_md_request(self, request):
         path = request.match_info['path']
-        file_path = os.path.join('./static', f"{path}.md")
+        file_path = os.path.join(self.root, 'static', f"{path}.md")
         format = request.query.get('format', 'render')
 
         if os.path.exists(file_path) and os.path.isfile(file_path):
@@ -166,6 +167,7 @@ class RabbitMQProtocol(Protocol):
         self.channel: aio_pika.Channel = None
         self.exchange: aio_pika.Exchange = None
         self.queue: aio_pika.Queue = None
+        self.offline_queue: List[Dict[str, Any]] = []
 
     async def arun(self):
         try:
@@ -185,6 +187,8 @@ class RabbitMQProtocol(Protocol):
 
         # Bind the queue to the exchange, to receive all messages
         await self.queue.bind(self.exchange)
+        for msg in self.offline_queue:
+            await self.do_send(**msg)
         await self.receive_mq_mesg(),
 
     async def aclose(self):
@@ -196,6 +200,11 @@ class RabbitMQProtocol(Protocol):
     async def do_send(self, cmd:str, **kwargs):
         'broadcast message to RabbitMQ'
         kwargs['cmd'] = cmd
+
+        if not self.exchange:
+            self.offline_queue.append(kwargs)
+            return
+
         await self.exchange.publish(
             aio_pika.Message(body=json.dumps(kwargs).encode()),
             routing_key='',  # ignored for fanout exchanges
@@ -239,7 +248,12 @@ class GPTChatProtocol(Protocol):
 
     async def arun(self):
         # Ensure the OpenAI client is authenticated
-        api_key = self.config.get('openai.key')
+        api_key = self.config.get('openai.key', None)
+        if api_key is None:
+            logger.warn('Missing OpenAI API key in config')
+            # request api key
+            asyncio.create_task(self.request_key())
+
         self.messages = [
             {"role": "system", "content": "You are a helpful assistant representing agi.green."},
         ]

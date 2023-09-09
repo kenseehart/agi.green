@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+from os.path import join, dirname, abspath
 from dispatcher import Dispatcher, logger
 from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol
 from config import Config
@@ -21,12 +22,15 @@ class ChatNode(Dispatcher):
     This represents a single connection to a browser for one user.
     '''
 
-    def __init__(self, port:int=8000, rabbitmq_host:str='localhost'):
+    def __init__(self, root:str='.', port:int=8000, rabbitmq_host:str='localhost'):
         super().__init__()
+        self.root = root
         self.port = port
-        self.config = Config('agi_config.yaml', 'agi_config_default.yaml')
+        self.config = Config(
+            join(self.root, 'agi_config.yaml'),
+            join(self.root, 'agi_config_default.yaml'))
 
-        self.http = HTTPProtocol(port=port, nocache=True)
+        self.http = HTTPProtocol(root=root, port=port, nocache=True)
         self.ws = WebSocketProtocol(port=port+1)
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
         self.gpt = GPTChatProtocol(self.config)
@@ -78,7 +82,8 @@ def main():
         ptvsd.wait_for_attach()
         logger.info(".. debugger attached")
 
-    dispatcher = ChatNode(port=args.port, rabbitmq_host=default_rabbitmq_host)
+    dispatcher = ChatNode(root=dirname(abspath(__file__)),
+                          port=args.port, rabbitmq_host=default_rabbitmq_host)
     dispatcher.run()
 
 if __name__ == "__main__":

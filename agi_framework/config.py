@@ -3,6 +3,8 @@ import shutil
 from typing import Any, Dict
 import yaml
 
+_None = object()
+
 class Config():
     '''
     Access a configuration as a YAML file backed by a default config.
@@ -61,14 +63,19 @@ class Config():
             self.cached_data = yaml_data
             self.last_modified = os.path.getmtime(self.filepath)
 
-    def get(self, key: str):
+    def get(self, key: str, default: Any = _None):
         'get config value'
         config = self.load_config()
         keys = key.split('.')
         value = config
-        for k in keys:
-            value = value[k]
-        return value
+        try:
+            for k in keys:
+                value = value[k]
+            return value
+        except KeyError:
+            if default is not _None:
+                return default
+            raise
 
     def set(self, key: str, value: Any):
         'set config value'
@@ -94,4 +101,8 @@ class Config():
         if keys[-1] in d:
             del d[keys[-1]]
             self.save_config(config)
+
+    def __getitem__(self, key: str):
+        return self.get(key)
+
 

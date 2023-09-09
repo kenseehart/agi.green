@@ -82,7 +82,7 @@ class Protocol:
 
     def _register_methods(self):
         'Register methods for a protocol'
-        registry = self.root._registered_methods_cache
+        registry = self._root._registered_methods_cache
         re_on_cmd = re.compile(r'^on_(\w+?)_(\w+)$')
 
         # Register methods for children
@@ -102,9 +102,9 @@ class Protocol:
 
 
     @property
-    def root(self):
+    def _root(self):
         'Return root protocol (dispatcher)'
-        return self.parent.root if self.parent else self
+        return self.parent._root if self.parent else self
 
     @property
     def all_children(self) -> List['Protocol']:
@@ -140,7 +140,7 @@ class Protocol:
             self.add_protocol(p)
 
     def get_protocol(self, protocol_id: str) -> "Protocol":
-        return self.root.registered_protocols[protocol_id]
+        return self._root.registered_protocols[protocol_id]
 
     def catch_exception(self, exception: Exception):
         self.exception = exception
@@ -159,7 +159,7 @@ class Protocol:
         logger.info(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
 
         # call registered handler
-        cmd_handlers = self.root.registered_methods[self.protocol_id][cmd]
+        cmd_handlers = self._root.registered_methods[self.protocol_id][cmd]
 
         if cmd_handlers:
             for handler in cmd_handlers:
@@ -174,7 +174,7 @@ class Protocol:
     async def send(self, protocol_id, cmd:str, **kwargs):
         'send message via specified protocol'
         logger.info(f'sending: {protocol_id}:{format_call(cmd, kwargs)}')
-        await self.root.get_protocol(protocol_id).do_send(cmd, **kwargs)
+        await self._root.get_protocol(protocol_id).do_send(cmd, **kwargs)
 
     async def do_send(self, cmd: str, **kwargs):
         'default: send request to self - override to implement a protocol specific send'
