@@ -3,10 +3,11 @@ implementation of ws, mq and http protocols
 '''
 
 import os
+from os.path import join, dirname
 import time
 import shutil
 import yaml
-from typing import Callable, Awaitable, Dict, Any, List, Set
+from typing import Callable, Awaitable, Dict, Any, List, Set, Union, Tuple
 from logging import getLogger, Logger
 import json
 import asyncio
@@ -19,6 +20,10 @@ import openai
 
 from dispatcher import Protocol, format_call, logger
 from config import Config
+
+from queue import Queue
+
+here = dirname(__file__)
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -72,7 +77,7 @@ class HTTPProtocol(Protocol):
     '''
     protocol_id: str = 'http'
 
-    def __init__(self, root:str, port:int=8000, nocache=False, **kwargs):
+    def __init__(self, root:str, port:int=8000, static:Union[Tuple[str], str]=(), nocache=False, **kwargs):
         super().__init__(**kwargs)
         self.root = root
         self.port = port
@@ -82,14 +87,28 @@ class HTTPProtocol(Protocol):
         self.md_content = None
         self.substitutions = {}
 
+        if isinstance(static, str):
+            static = (static,)
+
+        self.static = static + (join(here, 'static'),)
+
         if nocache:
             # force browser to reload static content
             self.substitutions['__TIMESTAMP__'] = str(time.time())
 
+    @web.middleware
+    async def apply_substitutions(self, request, handler):
+        response = await handler(request)
+
+        if hasattr(response, 'text'):
+            for key, value in self.substitutions.items():
+                response.text = response.text.replace(key, value)
+
+        return response
+
     async def arun(self):
         # Serve static http content from index.html
-        self.app = web.Application()
-        self.app.router.add_get('/', self.handle_get_root_request)
+        self.app = web.Application(middlewares=[self.apply_substitutions])
         self.app.router.add_get('/{path:.*}.md', self.handle_md_request)
         self.app.router.add_static('/', path=os.path.join(self.root, 'static'), name='static')
         self.runner = web.AppRunner(self.app)
@@ -111,13 +130,19 @@ class HTTPProtocol(Protocol):
         if self.runner:
             await self.runner.cleanup()
 
-    async def handle_get_root_request(self, request):
-        logger.info(f'GET /')
-        with open(os.path.join(self.root, 'static/index.html'), 'r') as file:
-            content = file.read()
-            for key, value in self.substitutions.items():
-                content = content.replace(key, value)
-            return web.Response(text=content, content_type='text/html')
+    def open_static(self, path:str):
+        'open static file from static directories'
+        for static_dir in self.static:
+            file_path = os.path.join(static_dir, path)
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                return open(file_path, 'r')
+
+        raise web.HTTPNotFound()
+
+    async def handle_root_request(self, request):
+        # Serve index.html from static directories
+        with self.open_static('index.html') as f:
+            return web.Response(text=f.read(), content_type='text/html')
 
     async def handle_md_request(self, request):
         path = request.match_info['path']
@@ -167,7 +192,8 @@ class RabbitMQProtocol(Protocol):
         self.channel: aio_pika.Channel = None
         self.exchange: aio_pika.Exchange = None
         self.queue: aio_pika.Queue = None
-        self.offline_queue: List[Dict[str, Any]] = []
+        self.offline_queue: Queue = Queue() # queue for messages pending connection
+        self.connected = False
 
     async def arun(self):
         try:
@@ -187,8 +213,14 @@ class RabbitMQProtocol(Protocol):
 
         # Bind the queue to the exchange, to receive all messages
         await self.queue.bind(self.exchange)
-        for msg in self.offline_queue:
-            await self.do_send(**msg)
+        self.connected = True
+
+        logger.info(f'Connected to RabbitMQ on {self.host}:{self.port}')
+
+        # Send any pending messages
+        for cmd, kwargs in self.offline_queue.queue:
+            await self.do_send(cmd, **kwargs)
+
         await self.receive_mq_mesg(),
 
     async def aclose(self):
@@ -199,6 +231,10 @@ class RabbitMQProtocol(Protocol):
 
     async def do_send(self, cmd:str, **kwargs):
         'broadcast message to RabbitMQ'
+        if not self.connected:
+            self.offline_queue.put((cmd, kwargs))
+            return
+
         kwargs['cmd'] = cmd
 
         if not self.exchange:
@@ -248,7 +284,7 @@ class GPTChatProtocol(Protocol):
 
     async def arun(self):
         # Ensure the OpenAI client is authenticated
-        api_key = self.config.get('openai.key', None)
+        api_key = self.config.get('openai.key', None, None)
         if api_key is None:
             logger.warn('Missing OpenAI API key in config')
             # request api key

@@ -1,8 +1,6 @@
-- refactor: dispatcher contains protocols instead of as mixins
 - controlled exception handling (exception=None)
 - rename, refactor: javascript into agi-green.js, agi-green-chat.js
 - persistent data (avatar)
-- avatar box next to each message
 - info bot (avatar, name, color, upload image)
 - rabbitmq swarm
 - deploy on agi.green site

@@ -3,4 +3,5 @@ aio_pika==9.2.0
 websockets
 ptvsd==4.3.2
 openai
+pyyaml
 flask==2.3.3

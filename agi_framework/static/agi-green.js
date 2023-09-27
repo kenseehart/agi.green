@@ -1,15 +1,8 @@
 // Create a connection to the WebSocket server
 // Get HTTP protocol (http or https)
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-
-// Get HTTP host
 const host = window.location.hostname;
-
-// Get HTTP port and increment by 1 for WebSocket
-const port = parseInt(window.location.port) + 1;
-
-// Create a connection to the WebSocket server
-const socket = new WebSocket(`${protocol}//${host}:${port}`);
+const socket = new WebSocket(`${protocol}//${host}/ws/`);
 
 const md = markdownit({
     // Enable HTML in the markdown source

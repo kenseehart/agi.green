@@ -1,4 +1,5 @@
 import os
+from os.path import join, dirname
 import sys
 import argparse
 from os.path import join, dirname, abspath
@@ -10,6 +11,8 @@ from config import Config
 # VScode debug port 5678
 # Browser port -p option (default=8000)
 # WebSocket port is browser port + 1 (default=8001)
+
+here = dirname(__file__)
 
 class ChatNode(Dispatcher):
     '''
@@ -27,8 +30,9 @@ class ChatNode(Dispatcher):
         self.root = root
         self.port = port
         self.config = Config(
-            join(self.root, 'agi_config.yaml'),
-            join(self.root, 'agi_config_default.yaml'))
+            join(here, 'agi_config.yaml'),
+            join(here, 'agi_config_default.yaml'),
+        )
 
         self.http = HTTPProtocol(root=root, port=port, nocache=True)
         self.ws = WebSocketProtocol(port=port+1)
