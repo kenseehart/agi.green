@@ -11,6 +11,7 @@ from typing import Callable, Awaitable, Dict, Any, List, Set, Union, Tuple
 from logging import getLogger, Logger
 import json
 import asyncio
+import aiofiles
 
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
@@ -77,7 +78,7 @@ class HTTPProtocol(Protocol):
     '''
     protocol_id: str = 'http'
 
-    def __init__(self, root:str, port:int=8000, static:Union[Tuple[str], str]=(), nocache=False, **kwargs):
+    def __init__(self, root:str, port:int=8000, nocache=False, **kwargs):
         super().__init__(**kwargs)
         self.root = root
         self.port = port
@@ -86,31 +87,55 @@ class HTTPProtocol(Protocol):
         self.site:web.TCPSite = None
         self.md_content = None
         self.substitutions = {}
-
-        if isinstance(static, str):
-            static = (static,)
-
-        self.static = static + (join(here, 'static'),)
+        self.static = [join(here, 'static')]
 
         if nocache:
             # force browser to reload static content
             self.substitutions['__TIMESTAMP__'] = str(time.time())
 
+    def add_static(self, path:str):
+        'add static directory'
+        self.static.append(path)
+
     @web.middleware
-    async def apply_substitutions(self, request, handler):
+    async def apply_substitutions(self, request:web.Request, handler:Callable[[web.Request], Awaitable[web.Response]]):
         response = await handler(request)
 
-        if hasattr(response, 'text'):
+        if self.substitutions and isinstance(response, web.Response) and response.body is not None:
+            text = response.text
             for key, value in self.substitutions.items():
-                response.text = response.text.replace(key, value)
-
+                text = text.replace(key, value)
+            response = web.Response(text=text, headers=response.headers, status=response.status)
         return response
+
+    def find_static(self, filename:str):
+        for static_dir in self.static:
+            file_path = os.path.join(static_dir, filename)
+            if os.path.isfile(file_path):
+                return file_path
+        return None
+
+    async def handle_static(self, request:web.Request):
+        filename = request.match_info['filename'] or 'index.html'
+        file_path = self.find_static(filename)
+        if file_path is None:
+            return web.Response(status=404)
+
+        if filename.endswith('.md'):
+            # Preprocess the .md file
+            async with aiofiles.open(file_path, mode='r') as f:
+                content = await f.read()
+                # Preprocess the content here
+            return web.Response(text=content)
+        else:
+            return web.FileResponse(path=file_path)
 
     async def arun(self):
         # Serve static http content from index.html
         self.app = web.Application(middlewares=[self.apply_substitutions])
-        self.app.router.add_get('/{path:.*}.md', self.handle_md_request)
-        self.app.router.add_static('/', path=os.path.join(self.root, 'static'), name='static')
+        self.app.router.add_get('/{filename:.*}', self.handle_static)
+        self.app.router.add_get('/', self.handle_static, name='index')
+        self.app.middlewares.append(self.apply_substitutions)
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
@@ -129,45 +154,6 @@ class HTTPProtocol(Protocol):
         # Finally, cleanup the AppRunner
         if self.runner:
             await self.runner.cleanup()
-
-    def open_static(self, path:str):
-        'open static file from static directories'
-        for static_dir in self.static:
-            file_path = os.path.join(static_dir, path)
-            if os.path.exists(file_path) and os.path.isfile(file_path):
-                return open(file_path, 'r')
-
-        raise web.HTTPNotFound()
-
-    async def handle_root_request(self, request):
-        # Serve index.html from static directories
-        with self.open_static('index.html') as f:
-            return web.Response(text=f.read(), content_type='text/html')
-
-    async def handle_md_request(self, request):
-        path = request.match_info['path']
-        file_path = os.path.join(self.root, 'static', f"{path}.md")
-        format = request.query.get('format', 'render')
-
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            with open(file_path, 'r') as f:
-                self.md_content = f.read()
-
-            self.md_format = format
-
-            if format == 'text':
-                return web.Response(text=self.md_content, content_type='text/plain')
-
-            with open('md_template.html', 'r') as template_file:
-                template = template_file.read()
-
-            for key, value in self.substitutions.items():
-                template = template.replace(key, value)
-
-            return web.Response(text=template, content_type='text/html')
-
-        # If the file doesn't exist, return a 404 Not Found
-        raise web.HTTPNotFound()
 
     async def on_ws_request_md_content(self):
         'request markdown content from browser via websocket'
@@ -284,7 +270,7 @@ class GPTChatProtocol(Protocol):
 
     async def arun(self):
         # Ensure the OpenAI client is authenticated
-        api_key = self.config.get('openai.key', None, None)
+        api_key = self.config.get('openai.key', None)
         if api_key is None:
             logger.warn('Missing OpenAI API key in config')
             # request api key

@@ -5,8 +5,6 @@ import yaml
 
 _None = object()
 
-_None = object()
-
 class Config():
     '''
     Access a configuration as a YAML file backed by a default config.

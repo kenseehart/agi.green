@@ -33,7 +33,7 @@ class Game:
 
 
 
-class GameUIProtocol(Protocol):
+class GameProtocol(Protocol):
     '''
     Turn-based game protocol
 
