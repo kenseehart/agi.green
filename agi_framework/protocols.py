@@ -23,6 +23,7 @@ from dispatcher import Protocol, format_call, logger
 from config import Config
 
 from queue import Queue
+from os.path import exists
 
 here = dirname(__file__)
 
@@ -30,6 +31,14 @@ here = dirname(__file__)
 # VScode debug port 5678
 # Browser port -p option (default=8000)
 # WebSocket port is browser port + 1 (default=8001)
+
+text_content_types = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+}
 
 class WebSocketProtocol(Protocol):
     '''
@@ -69,7 +78,6 @@ class WebSocketProtocol(Protocol):
         for ws in self.connected:
             await ws.send(json.dumps(kwargs))
 
-
 class HTTPProtocol(Protocol):
     '''
     http server
@@ -95,18 +103,9 @@ class HTTPProtocol(Protocol):
 
     def add_static(self, path:str):
         'add static directory'
+        if not exists(path):
+            logger.warn(f'Static directory {path}: does not exist')
         self.static.append(path)
-
-    @web.middleware
-    async def apply_substitutions(self, request:web.Request, handler:Callable[[web.Request], Awaitable[web.Response]]):
-        response = await handler(request)
-
-        if self.substitutions and isinstance(response, web.Response) and response.body is not None:
-            text = response.text
-            for key, value in self.substitutions.items():
-                text = text.replace(key, value)
-            response = web.Response(text=text, headers=response.headers, status=response.status)
-        return response
 
     def find_static(self, filename:str):
         for static_dir in self.static:
@@ -118,24 +117,38 @@ class HTTPProtocol(Protocol):
     async def handle_static(self, request:web.Request):
         filename = request.match_info['filename'] or 'index.html'
         file_path = self.find_static(filename)
+
         if file_path is None:
             return web.Response(status=404)
 
-        if filename.endswith('.md'):
+        ext = os.path.splitext(filename)[1]
+        content_type = text_content_types.get(ext, None) # None means binary
+
+        if content_type == 'text/markdown':
             # Preprocess the .md file
-            async with aiofiles.open(file_path, mode='r') as f:
+            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
                 content = await f.read()
                 # Preprocess the content here
-            return web.Response(text=content)
-        else:
-            return web.FileResponse(path=file_path)
+                return web.Response(text=content, content_type=content_type)
+
+        # If substitutions are required for textual files
+        elif content_type is not None:
+            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
+                text = await f.read()
+
+            if self.substitutions:
+                for key, value in self.substitutions.items():
+                    text = text.replace(key, value)
+
+                response = web.Response(text=text, content_type=content_type)
+                return response
+        return web.FileResponse(file_path)
 
     async def arun(self):
         # Serve static http content from index.html
-        self.app = web.Application(middlewares=[self.apply_substitutions])
+        self.app = web.Application()
         self.app.router.add_get('/{filename:.*}', self.handle_static)
         self.app.router.add_get('/', self.handle_static, name='index')
-        self.app.middlewares.append(self.apply_substitutions)
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)

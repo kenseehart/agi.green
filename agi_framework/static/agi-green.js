@@ -42,11 +42,6 @@ socket.addEventListener('open', (event) => {
 });
 
 let userData = {};
-let wsHandlers = {};
-
-function wsRegisterHandlers(handlers) {
-    wsHandlers = { ...wsHandlers, ...handlers };
-}
 
 function setTextWithNewlines(element, text) {
     // First clear the current content
@@ -66,69 +61,92 @@ function setTextWithNewlines(element, text) {
     }
 }
 
-wsRegisterHandlers({
-    'set_user_data': function(msg) {
-        // Set the user's ID and username
-        userData[msg.uid] = msg;
-        console.log('userData:', userData);
-    },
+function on_ws_set_user_data(msg) {
+    // Set the user's ID and username
+    userData[msg.uid] = msg;
+    console.log('userData:', userData);
+}
 
-    'append_chat': function(msg) {
-        // Get the user's ID and username
-        const uid = msg.author;
-        const user = userData[uid];
+function on_ws_append_chat(msg) {
+    // Get the user's ID and username
+    const uid = msg.author;
+    const user = userData[uid];
 
-        // Render markdown content
-        const renderedHtml = md.render(msg.content);
+    // Render markdown content
+    const renderedHtml = md.render(msg.content);
 
-        // Append to messages
-        const messages = document.getElementById('messages');
-        const newMessageBlock = document.createElement('div');
-        const newMessage = document.createElement('div');
-        const avatarImage = document.createElement('img');
-        avatarImage.className = 'avatar';
-        avatarImage.src = `${user.icon}`;
-        avatarImage.alt = `${user.name}'s avatar`;
-        avatarImage.title = user.name; // for the mouse-over text
+    // Append to messages
+    const messages = document.getElementById('messages');
+    const newMessageBlock = document.createElement('div');
+    const newMessage = document.createElement('div');
+    const avatarImage = document.createElement('img');
+    avatarImage.className = 'avatar';
+    avatarImage.src = `${user.icon}`;
+    avatarImage.alt = `${user.name}'s avatar`;
+    avatarImage.title = user.name; // for the mouse-over text
 
-        newMessage.className = 'chat-message';
-        newMessage.innerHTML += renderedHtml;
-        newMessageBlock.className = 'chat-message-block';
-        newMessageBlock.appendChild(avatarImage);
-        newMessageBlock.appendChild(newMessage);
-        messages.appendChild(newMessageBlock);
+    newMessage.className = 'chat-message';
+    newMessage.innerHTML += renderedHtml;
+    newMessageBlock.className = 'chat-message-block';
+    newMessageBlock.appendChild(avatarImage);
+    newMessageBlock.appendChild(newMessage);
+    messages.appendChild(newMessageBlock);
 
 
-        // Initialize Mermaid for new elements
-        mermaid.init(undefined, newMessage.querySelectorAll('.language-mermaid'));
+    // Initialize Mermaid for new elements
+    mermaid.init(undefined, newMessage.querySelectorAll('.language-mermaid'));
 
-        // Process MathJax (if necessary)
-        window.MathJax.typesetPromise([newMessage]);
+    // Process MathJax (if necessary)
+    window.MathJax.typesetPromise([newMessage]);
 
-        // Scroll to the bottom of the messages
-        messages.scrollTop = messages.scrollHeight;
-    },
+    // Scroll to the bottom of the messages
+    messages.scrollTop = messages.scrollHeight;
+}
 
-    'update_md_content': function(msg) {
-        // Update the markdown content
-        const mdSource = document.getElementById('md-source');
-        setTextWithNewlines(mdSource, msg.content);
-        autoResize.call(mdSource);
-        const renderedContent = md.render(msg.content)
-        const mdRendered = document.getElementById('md-render');
-        mdRendered.innerHTML = renderedContent;
-        autoResize.call(mdRendered);
-        mermaid.init(undefined, mdRendered.querySelectorAll('.language-mermaid'));
-        window.MathJax.typesetPromise([mdRendered]);
+function on_ws_update_md_content(msg) {
+    // Update the markdown content
+    const mdSource = document.getElementById('md-source');
+    setTextWithNewlines(mdSource, msg.content);
+    autoResize.call(mdSource);
+    const renderedContent = md.render(msg.content)
+    const mdRendered = document.getElementById('md-render');
+    mdRendered.innerHTML = renderedContent;
+    autoResize.call(mdRendered);
+    mermaid.init(undefined, mdRendered.querySelectorAll('.language-mermaid'));
+    window.MathJax.typesetPromise([mdRendered]);
 
-        if (msg.format === 'source') {
-            showSource();
-        }
-        else {
-            showRendered();
-        }
+    if (msg.format === 'source') {
+        showSource();
     }
-});
+    else {
+        showRendered();
+    }
+}
+
+// Workspace injection
+// Add a web component to the workspace
+
+function on_ws_workspace_component(msg) {
+    // Ensure the game-component script is loaded only once
+
+    if (!window.workspaceComponentsLoaded) {
+        window.workspaceComponentsLoaded = {};
+    }
+
+    if (!window.workspaceComponentsLoaded[msg.name]) {
+        const script = document.createElement('script');
+        script.src = msg.name+'_component.js?ts='+Date.now();
+        script.onload = function() {
+            // call {msg.name}_component.js's inject_{msg.name}() function
+            window.workspaceComponentsLoaded[msg.name] = true;
+            window['inject_'+msg.name]();
+        };
+        document.body.appendChild(script);
+    }
+    else {
+        window['inject_'+msg.name]();
+    }
+}
 
 // Listen for messages from server
 socket.addEventListener('message', (event) => {
@@ -143,8 +161,8 @@ socket.addEventListener('message', (event) => {
 
     console.log('received ws message:', msg);
 
-    if (msg.cmd in wsHandlers) {
-        wsHandlers[msg.cmd](msg);
+    if (window['on_ws_'+msg.cmd]) {
+        window['on_ws_'+msg.cmd](msg);
     } else {
         console.log('Unknown command:', msg.cmd);
     }
@@ -310,3 +328,4 @@ if (vsplitter) {
         document.removeEventListener('mouseup', mouseUpHandler);
     };
 }
+

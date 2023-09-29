@@ -87,7 +87,7 @@ def main():
         logger.info(".. debugger attached")
 
     dispatcher = ChatNode(root=dirname(abspath(__file__)),
-                          port=args.port, rabbitmq_host=default_rabbitmq_host)
+        port=args.port, rabbitmq_host=default_rabbitmq_host)
     dispatcher.run()
 
 if __name__ == "__main__":
