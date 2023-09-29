@@ -7,7 +7,7 @@ from config import Config
 from typing import Dict, Any
 from os.path import join, dirname, abspath, exists
 
-here = dirname(abspath(__file__))  
+here = dirname(abspath(__file__))
 
 class Game:
     '''generic game class
@@ -52,6 +52,7 @@ class GameProtocol(Protocol):
     async def arun(self):
         'initialize game'
         self.get_protocol('http').add_static(join(here, 'static'))
+        
 
 
     async def on_ws_connect(self):

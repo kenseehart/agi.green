@@ -33,4 +33,4 @@ function inject_gameio()
     document.getElementById('workspace').appendChild(gameBoard);
 }
 console.log("inject_gameio defined:", typeof inject_gameio);
-// Path: agi.green/agi_framework/gameio/static/gameio_component.js
+

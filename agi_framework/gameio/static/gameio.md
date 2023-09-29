@@ -13,7 +13,7 @@ This message is responsible for setting up the board, defining locations, and in
 ```json
 {
     "action": "initialize",
-    "boardImage": "board_filename.jpg",
+    "board_image": "board_filename.jpg",
     "locations": [
         {"id": "locationA", "coords": [0.5, 0.2]},
         {"id": "locationB", "coords": [0.1, 0.3]},
