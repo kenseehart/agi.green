@@ -54,13 +54,33 @@ This structure allows easy extensions for future properties, be it aesthetic enh
 
 These messages convey game actions like moving, placing, and removing pieces.
 
-### Moving a piece:
+### Specifying legal moves:
 
-To move an existing piece from one location to another.
+The game class provides a list of legal moves for the current position. This informaiton is forwarded to the client js app.
+```json
+{
+    "cmd": "allow",
+    "moves": ["locationA", "locationB", ...]
+}
+```
+When the user clicks on an allowed location, a ws message is sent to the server:
 
 ```json
 {
-    "action": "move",
+    "cmd": "move",
+    "to": "locationA"
+}
+```
+
+(This is just shorthand for placement games such as Go or Y. For other games, the moves list is a list of move dictionaries, details to be specified...)
+
+### Moving a piece:
+
+To move an existing piece from one location to another, the server sends:
+
+```json
+{
+    "cmd": "move",
     "piece": "piece1",
     "from": "locationA",
     "to": "locationB"
@@ -73,7 +93,7 @@ To place a new piece on the board. The absence of a "from" field indicates this 
 
 ```json
 {
-    "action": "move",
+    "cmd": "move",
     "piece": "piece2",
     "to": "locationC"
 }
@@ -81,15 +101,18 @@ To place a new piece on the board. The absence of a "from" field indicates this 
 
 ### Removing a piece:
 
-This can be interpreted as moving a piece to a null location. Alternatively, a distinct action can be used for clarity.
+This is accomplished by omitting `"to"`.
 
 ```json
 {
-    "action": "remove",
-    "piece": "piece1",
+    "cmd": "move",
     "from": "locationA"
 }
 ```
+
+### Messages from UI:
+
+If legal
 
 ### Notes:
 

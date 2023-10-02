@@ -52,8 +52,6 @@ class GameProtocol(Protocol):
     async def arun(self):
         'initialize game'
         self.get_protocol('http').add_static(join(here, 'static'))
-        
-
 
     async def on_ws_connect(self):
         'websocket connected'

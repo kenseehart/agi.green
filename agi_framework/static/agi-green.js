@@ -128,6 +128,7 @@ function on_ws_update_md_content(msg) {
 
 function on_ws_workspace_component(msg) {
     // Ensure the game-component script is loaded only once
+    console.log('on_ws_workspace_component:', msg);
 
     if (!window.workspaceComponentsLoaded) {
         window.workspaceComponentsLoaded = {};
