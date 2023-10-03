@@ -41,6 +41,13 @@ socket.addEventListener('open', (event) => {
     onWSConnected();
 });
 
+function send_ws(cmd, data={}) {
+    // Send a message to the server
+    msg = {cmd, ...data}
+    console.log('send_ws:', msg);
+    socket.send(JSON.stringify(msg));
+}
+
 let userData = {};
 
 function setTextWithNewlines(element, text) {
@@ -137,10 +144,12 @@ function on_ws_workspace_component(msg) {
     if (!window.workspaceComponentsLoaded[msg.name]) {
         const script = document.createElement('script');
         script.src = msg.name+'_component.js?ts='+Date.now();
+        add_ws_promise(msg.name);
         script.onload = function() {
             // call {msg.name}_component.js's inject_{msg.name}() function
             window.workspaceComponentsLoaded[msg.name] = true;
             window['inject_'+msg.name]();
+            resolve_ws_promise(msg.name);
         };
         document.body.appendChild(script);
     }
@@ -162,12 +171,72 @@ socket.addEventListener('message', (event) => {
 
     console.log('received ws message:', msg);
 
-    if (window['on_ws_'+msg.cmd]) {
-        window['on_ws_'+msg.cmd](msg);
-    } else {
-        console.log('Unknown command:', msg.cmd);
+    // queue the message until all promises are resolved
+    if (!window.wsMessageQueue) {
+        window.wsMessageQueue = [];
+    }
+    if (!window.wsPromises) {
+        window.wsPromises = [];
+    }
+
+    window.wsMessageQueue.push(msg);
+
+    if (window.wsPromises.length === 0) {
+        // Process the queued ws messages
+        process_ws_messages();
+    }
+    else {
+        console.log('ws message queued, pending promise', msg);
     }
 });
+
+function process_ws_messages() {
+    // Process the queued ws messages
+    if (!window.wsMessageQueue) {
+        window.wsMessageQueue = [];
+    }
+
+    while (window.wsMessageQueue.length > 0) {
+        const msg = window.wsMessageQueue.shift();
+        console.log('processing ws message:', msg);
+
+        if (window['on_ws_'+msg.cmd]) {
+            window['on_ws_'+msg.cmd](msg);
+        } else {
+            console.log('Unknown command:', msg.cmd);
+        }
+    }
+};
+
+function add_ws_promise(promise) {
+    // Add a promise to the list of promises to be resolved
+    // ws messages will be queued and processed after all promises are resolved
+    if (!window.wsPromises) {
+        window.wsPromises = [];
+    }
+    window.wsPromises.push(promise);
+    console.log('ws promise added:', promise, '- pending promises:', window.wsPromises.length);
+}
+
+function resolve_ws_promise(promise) {
+    // Remove a promise from the list of promises to be resolved
+    // ws messages will be queued and processed after all promises are resolved
+    if (!window.wsPromises) {
+        window.wsPromises = [];
+    }
+    // Remove the promise from the list
+    const index = window.wsPromises.indexOf(promise);
+    if (index > -1) {
+        console.log('ws promise resolved:', promise, 'pending promises:', window.wsPromises.length-1);
+        window.wsPromises.splice(index, 1);
+    }
+    // Check if all promises have been resolved
+    if (window.wsPromises.length === 0) {
+        // Process the queued ws messages
+        process_ws_messages();
+    }
+}
+
 
 
 function error(msg) {
@@ -188,10 +257,9 @@ function onChatInput() {
     if (message !== '') {
 
         if(socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                cmd: 'chat_input',
+            send_ws('chat_input', {
                 content: message
-            }));
+            });
             inputText.value = '';  // Clear the input field
         } else {
             error('WebSocket is not open');
@@ -264,7 +332,7 @@ function onWSConnected() {
 
         console.log('requesting md content cmd');
 
-        socket.send(JSON.stringify({ 'cmd': 'request_md_content' }));
+        send_ws('request_md_content');
     }
 }
 
