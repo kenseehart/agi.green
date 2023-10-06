@@ -1,7 +1,12 @@
+/* gameio_component.js */
+
 class GameBoard extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+
+        this.boardElement = null;
+        this.allowed = [];
     }
 
     connectedCallback() {
@@ -10,12 +15,12 @@ class GameBoard extends HTMLElement {
         styleLink.setAttribute('href', 'gameio.css');
         this.shadowRoot.appendChild(styleLink);
 
-        const gameBoardContainer = document.createElement('div');
-        gameBoardContainer.className = 'game_board_container';
-        this.shadowRoot.appendChild(gameBoardContainer);
-
-        this.boardElement = gameBoardContainer;
-        this.allowed = [];
+        const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgElement.setAttribute('viewBox', '0 0 1 1'); // Normalized view
+        svgElement.style.width = '100%';
+        svgElement.style.height = '100%';
+        this.shadowRoot.appendChild(svgElement);
+        this.boardElement = svgElement;
 
         this.boardElement.addEventListener('click', this.handleClick.bind(this));
     }
@@ -64,33 +69,33 @@ function on_ws_gameio_init(msg) {
     console.log("on_ws_gameio_init:", msg);
     const gameBoard = document.querySelector('game-board');
 
-    // Image setup
-    const img = document.createElement('img');
-    img.src = msg.board_image;
-    img.alt = msg.alt_text;
-    img.className = 'game_board';
+    // Image setup using SVG
+    const svgImage = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    svgImage.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', msg.board_image);
+    svgImage.setAttribute('x', '0');
+    svgImage.setAttribute('y', '0');
+    svgImage.setAttribute('width', '1');
+    svgImage.setAttribute('height', '1');
 
-    // Ensure the image is appended to the .game_board_container
-    const gameBoardContainer = gameBoard.shadowRoot.querySelector('.game_board_container');
-    gameBoardContainer.appendChild(img);
+    gameBoard.boardElement.appendChild(svgImage);
 
     gameBoard.locations = msg.locations;
     gameBoard.pieces = msg.pieces;
 
-    // Appending pieces inside the gameBoardContainer to maintain relative positioning
+    // Appending pieces inside the gameBoard using SVG
     msg.locations.forEach(location => {
         msg.pieces.forEach(piece => {
-            const pieceImg = document.createElement('img');
-            pieceImg.src = piece.image;
-            pieceImg.alt = piece.desc;
-            pieceImg.className = 'game_piece';
-            pieceImg.style.position = 'absolute';
-            pieceImg.style.left = `calc(${location.coords[0] * 100}%)`;
-            pieceImg.style.top = `calc(${location.coords[1] * 100}%)`;
-            gameBoardContainer.appendChild(pieceImg);
+            const pieceImage = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+            pieceImage.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', piece.image);
+            pieceImage.setAttribute('x', location.coords[0] - 0.05); // Assuming piece width is 0.1 for normalization
+            pieceImage.setAttribute('y', location.coords[1] - 0.05); // Assuming piece height is 0.1 for normalization
+            pieceImage.setAttribute('width', '0.1'); // Normalized width
+            pieceImage.setAttribute('height', '0.1'); // Normalized height
+            gameBoard.boardElement.appendChild(pieceImage);
         });
     });
 }
+
 
 function on_ws_gameio_allow(msg) {
     console.log("on_ws_gameio_allow:", msg);
