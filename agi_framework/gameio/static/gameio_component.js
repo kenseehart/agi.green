@@ -82,19 +82,32 @@ function on_ws_gameio_init(msg) {
     gameBoard.locations = msg.locations;
     gameBoard.pieces = msg.pieces;
 
-    // Appending pieces inside the gameBoard using SVG
+    // Create a defs section to define the reusable images
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    gameBoard.boardElement.appendChild(defs);
+
+    // Define pieces in defs once
+    msg.pieces.forEach(piece => {
+        const pieceImageDef = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+        pieceImageDef.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', piece.image);
+        pieceImageDef.setAttribute('id', `def_${piece.id}`);
+        pieceImageDef.setAttribute('width', '0.08'); // Normalized width
+        pieceImageDef.setAttribute('height', '0.08'); // Normalized height
+        defs.appendChild(pieceImageDef);
+    });
+
+    // Use pieces in the gameBoard using the "use" element
     msg.locations.forEach(location => {
         msg.pieces.forEach(piece => {
-            const pieceImage = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-            pieceImage.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', piece.image);
-            pieceImage.setAttribute('x', location.coords[0] - 0.05); // Assuming piece width is 0.1 for normalization
-            pieceImage.setAttribute('y', location.coords[1] - 0.05); // Assuming piece height is 0.1 for normalization
-            pieceImage.setAttribute('width', '0.1'); // Normalized width
-            pieceImage.setAttribute('height', '0.1'); // Normalized height
-            gameBoard.boardElement.appendChild(pieceImage);
+            const pieceImageUse = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+            pieceImageUse.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `#def_${piece.id}`);
+            pieceImageUse.setAttribute('x', location.coords[0] - 0.04);
+            pieceImageUse.setAttribute('y', location.coords[1] - 0.04);
+            gameBoard.boardElement.appendChild(pieceImageUse);
         });
     });
 }
+
 
 
 function on_ws_gameio_allow(msg) {
