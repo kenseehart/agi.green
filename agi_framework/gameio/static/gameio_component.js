@@ -1,5 +1,10 @@
 /* gameio_component.js */
 
+/* Nameing convention:
+Use python naming convention for things that are defined in python, and messages.
+Use camelCase for things that are entirely in the javascript domain.
+*/
+
 class GameBoard extends HTMLElement {
     constructor() {
         super();
@@ -25,8 +30,20 @@ class GameBoard extends HTMLElement {
         this.boardElement.addEventListener('click', this.handleClick.bind(this));
     }
 
-    do_move(msg) {
+    doMove(msg) {
+        console.log("doMove:", msg);
         // implement board update logic here
+        this.allowed = [];
+
+        if (msg.from) {
+            const pieceElement = this.pieceElements[[msg.from, msg.piece]];
+            pieceElement.setAttribute('visibility', 'hidden');
+        }
+
+        if (msg.dest) {
+            const pieceElement = this.pieceElements[[msg.dest, msg.piece]];
+            pieceElement.setAttribute('visibility', 'visible');
+        }
     }
 
     getLocationIdAt(locations, relX, relY, radius = 0.05) {
@@ -45,22 +62,25 @@ class GameBoard extends HTMLElement {
     }
 
     handleClick(e) {
-        const rect = this.boardElement.getBoundingClientRect();
+        const rect = this.boardImage.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        const boardSize = Math.min(rect.width, rect.height);
-        const clickedLocationId = this.getLocationIdAt(this.locations, x/boardSize, y/boardSize);
+        // Calculate relative positions:
+        const relX = x / rect.width;
+        const relY = y / rect.height;
 
-        if (this.allowed.includes(clickedLocationId)) {
-            sendWs('gameio_move', {
-                dest: clickedLocationId
-            });
-            this.do_move({
-                dest: clickedLocationId
-            });
+        const clickedLocationId = this.getLocationIdAt(this.locations, relX, relY);
+        console.log("handleClick:", clickedLocationId);
+
+        const move = this.allowed.find(move => move.dest === clickedLocationId);
+
+        if (move) {
+            send_ws('gameio_move', move);
+            this.doMove(move);
         }
     }
+
 }
 
 customElements.define('game-board', GameBoard);
@@ -78,9 +98,13 @@ function on_ws_gameio_init(msg) {
     svgImage.setAttribute('height', '1');
 
     gameBoard.boardElement.appendChild(svgImage);
+    gameBoard.boardImage = svgImage;
 
     gameBoard.locations = msg.locations;
     gameBoard.pieces = msg.pieces;
+    gameBoard.pieceElements = {};
+
+    const diameter = 0.086;
 
     // Create a defs section to define the reusable images
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -91,8 +115,8 @@ function on_ws_gameio_init(msg) {
         const pieceImageDef = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         pieceImageDef.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', piece.image);
         pieceImageDef.setAttribute('id', `def_${piece.id}`);
-        pieceImageDef.setAttribute('width', '0.08'); // Normalized width
-        pieceImageDef.setAttribute('height', '0.08'); // Normalized height
+        pieceImageDef.setAttribute('width', diameter.toString()); // Normalized width
+        pieceImageDef.setAttribute('height', diameter.toString()); // Normalized height
         defs.appendChild(pieceImageDef);
     });
 
@@ -101,9 +125,11 @@ function on_ws_gameio_init(msg) {
         msg.pieces.forEach(piece => {
             const pieceImageUse = document.createElementNS('http://www.w3.org/2000/svg', 'use');
             pieceImageUse.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `#def_${piece.id}`);
-            pieceImageUse.setAttribute('x', location.coords[0] - 0.04);
-            pieceImageUse.setAttribute('y', location.coords[1] - 0.04);
+            pieceImageUse.setAttribute('x', location.coords[0] - diameter/2);
+            pieceImageUse.setAttribute('y', location.coords[1] - diameter/2);
+            pieceImageUse.setAttribute('visibility', 'hidden');
             gameBoard.boardElement.appendChild(pieceImageUse);
+            gameBoard.pieceElements[[location.id, piece.id]] = pieceImageUse;
         });
     });
 }
@@ -113,12 +139,15 @@ function on_ws_gameio_init(msg) {
 function on_ws_gameio_allow(msg) {
     console.log("on_ws_gameio_allow:", msg);
     const gameBoard = document.querySelector('game-board');
-    gameBoard.allowed = msg.allow;
+    gameBoard.allowed = unpack(msg.moves);
 }
 
 function on_ws_gameio_move(msg) {
     console.log("on_ws_gameio_move:", msg);
     // Implement the logic to update the game board
+    const gameBoard = document.querySelector('game-board');
+    gameBoard.doMove(msg);
+
 }
 
 function inject_gameio()

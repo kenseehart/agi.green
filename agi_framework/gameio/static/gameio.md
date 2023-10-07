@@ -52,7 +52,7 @@ This structure allows easy extensions for future properties, be it aesthetic enh
 
 ## Action Messages
 
-These messages convey game actions like moving, placing, and removing pieces.
+These messages convey game actions like moving,w placing, and removing pieces.
 
 ### Specifying legal moves:
 
@@ -60,15 +60,19 @@ The game class provides a list of legal moves for the current position. This inf
 ```json
 {
     "cmd": "allow",
-    "moves": ["locationA", "locationB", ...]
+    "moves": [{"piece": "piece1", "dest": "locationA"}, ...]
 }
+
+The "moves" field can optionally use cartesian packing, like [{"piece":"w", "dest": ["1", "2", "5"] }].
+Other than that, it mirrors the `"move"` command schema.
+
 ```
 When the user clicks on an allowed location, a ws message is sent to the server:
 
 ```json
 {
     "cmd": "move",
-    "to": "locationA"
+    "dest": "locationA"
 }
 ```
 
@@ -101,7 +105,7 @@ To place a new piece on the board. The absence of a "from" field indicates this 
 
 ### Removing a piece:
 
-This is accomplished by omitting `"to"`.
+This is accomplished by omitting `"dest"`.
 
 ```json
 {

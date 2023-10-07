@@ -398,3 +398,50 @@ if (vsplitter) {
     };
 }
 
+function unpack(packedList) {
+    let unpacked = [];
+
+    for (let packedData of packedList) {
+        // Convert all values to arrays
+        let lists = {};
+        for (let key in packedData) {
+            lists[key] = Array.isArray(packedData[key]) ? packedData[key] : [packedData[key]];
+        }
+
+        let keys = Object.keys(lists);
+        let combinations = cartesianProduct(...Object.values(lists));
+
+        for (let combination of combinations) {
+            let unpackedItem = {};
+            keys.forEach((key, index) => {
+                unpackedItem[key] = combination[index];
+            });
+            unpacked.push(unpackedItem);
+        }
+    }
+
+    return unpacked;
+}
+
+function cartesianProduct(...arrays) {
+    return arrays.reduce((a, b) => {
+        return a.map(x => {
+            return b.map(y => {
+                return x.concat([y]);
+            });
+        }).reduce((a, b) => a.concat(b), []);
+    }, [[]]);
+}
+
+function index_key(key, arr) {
+    return arr.reduce((acc, obj) => {
+        if (obj[key]) {
+            if (!acc[obj[key]]) {
+                acc[obj[key]] = [];
+            }
+            acc[obj[key]].push(obj);
+        }
+        return acc;
+    }, {});
+}
+
