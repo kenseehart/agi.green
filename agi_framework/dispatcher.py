@@ -146,7 +146,7 @@ class Protocol:
         self.exception = exception
 
     async def arun(self):
-        raise NotImplementedError(f'{self.__class__.__name__}.arun() not implemented')
+        pass
 
     async def aclose(self):
         pass

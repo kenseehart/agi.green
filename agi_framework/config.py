@@ -2,8 +2,20 @@ import os
 import shutil
 from typing import Any, Dict
 import yaml
+from os import makedirs
 
 _None = object()
+
+def set_data_dir(path: str):
+    'set the data directory for the agi framework'
+    global _data_dir
+    _data_dir = path
+    makedirs(_data_dir, exist_ok=True)
+
+def get_data_dir() -> str:
+    'get the data directory for the agi framework'
+    global _data_dir
+    return _data_dir
 
 class Config():
     '''

@@ -6,6 +6,7 @@ import os
 from os.path import join, dirname
 import time
 import shutil
+import re
 import yaml
 from typing import Callable, Awaitable, Dict, Any, List, Set, Union, Tuple
 from logging import getLogger, Logger
@@ -24,6 +25,7 @@ from config import Config
 
 from queue import Queue
 from os.path import exists
+import ast
 
 here = dirname(__file__)
 
@@ -334,4 +336,42 @@ class GPTChatProtocol(Protocol):
             msg = f'OpenAI API error: {e}'
             logger.error(msg)
             return f'<span style="color:red">{msg}</span>'
+
+
+re_command = re.compile(r'''!(\w+\((['"=\w, ]*)\))''')
+
+
+class CommandProtocol(Protocol):
+    '''
+    Command protocol
+
+    Handle custom commands
+    '''
+    protocol_id: str = 'cmd'
+
+    def __init__(self, config:Config, **kwargs):
+        super().__init__(**kwargs)
+        self.config = config
+
+    async def arun(self):
+        pass
+
+    async def on_mq_chat(self, author:str, content:str):
+        'receive command syntax on the mq chat channel'
+
+        for match in re_command.finditer(content):
+            call_str = match.group(1)
+
+            # Parse the string as an expression using ast
+            try:
+                node = ast.parse(call_str, mode='eval').body
+
+                if isinstance(node, ast.Call):
+                    func_name = node.func.id
+                    kwargs = {kw.arg: kw.value.value for kw in node.keywords}
+                    await self.send('cmd', func_name, **kwargs)
+
+            except (SyntaxError, ValueError):
+                # This might occur if the matched string isn't a valid Python function call
+                logger.error(f'Invalid command syntax: {call_str}')
 

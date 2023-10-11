@@ -4,8 +4,11 @@ import sys
 import argparse
 from os.path import join, dirname, abspath
 from dispatcher import Dispatcher, logger
-from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol
+from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
+from gameio import GameIOProtocol
 from config import Config
+import re
+from ast import literal_eval
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -38,17 +41,17 @@ class ChatNode(Dispatcher):
         self.ws = WebSocketProtocol(port=port+1)
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
         self.gpt = GPTChatProtocol(self.config)
+        self.gameio = GameIOProtocol(self.config)
+        self.cmd = CommandProtocol(self.config)
 
         self.add_protocols(
             self.http,
             self.ws,
             self.mq,
             self.gpt,
+            self.gameio,
+            self.cmd,
         )
-
-    async def on_mq_chat(self, author:str, content:str):
-        'receive chat message from RabbitMQ'
-        await self.send('ws', 'append_chat', author=author, content=content)
 
     async def on_ws_connect(self):
         'handle new websocket connection'
@@ -59,6 +62,11 @@ class ChatNode(Dispatcher):
         'receive chat input from browser via websocket'
         # broadcast to all (including sender, which will echo back to browser)
         await self.send('mq', 'chat', author=f'K12345', content=content)
+
+    async def on_mq_chat(self, author:str, content:str):
+        'receive chat message from RabbitMQ'
+        await self.send('ws', 'append_chat', author=author, content=content)
+
 
 
 
