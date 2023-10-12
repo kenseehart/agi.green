@@ -51,10 +51,12 @@ class WebSocketProtocol(Protocol):
     def __init__(self, port:int=8000, **kwargs):
         super().__init__(**kwargs)
         self.port = port
-        self.connected: Set[WebSocketServerProtocol] = set()
+        self.socket = None
 
     async def arun(self):
-        await websockets.serve(self.handle_connection, '0.0.0.0', self.port)
+        if self.is_server:
+            self.connected = set()
+            await websockets.serve(self.handle_connection, '0.0.0.0', self.port)
 
     async def aclose(self):
         # Close all WebSocket connections
@@ -63,13 +65,18 @@ class WebSocketProtocol(Protocol):
         self.connected.clear()
 
     async def handle_connection(self, websocket, path):
-        'Register websocket connection and wait for messages'
+        'Register websocket connection and redirect messages to the node instance'
         self.connected.add(websocket)
         try:
-            await self.handle_mesg('connect')
+            node:Protocol = await self.handle_mesg('connect')
+            if node is None:
+                logger.error('No node returned from on_ws_connect')
+                return
+            node_ws = node.get_protocol('ws')
+            node_ws.socket = websocket
             async for mesg in websocket:
                 data = json.loads(mesg)
-                await self.handle_mesg(**data)
+                await node_ws.handle_mesg(**data)
         finally:
             # Unregister websocket connection
             self.connected.remove(websocket)
@@ -77,8 +84,8 @@ class WebSocketProtocol(Protocol):
     async def do_send(self, cmd:str, **kwargs):
         'send ws message to browser via websocket'
         kwargs['cmd'] = cmd
-        for ws in self.connected:
-            await ws.send(json.dumps(kwargs))
+        if self.socket:
+            await self.socket.send(json.dumps(kwargs))
 
 class HTTPProtocol(Protocol):
     '''

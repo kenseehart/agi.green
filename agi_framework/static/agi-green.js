@@ -77,7 +77,16 @@ function on_ws_set_user_data(msg) {
 function on_ws_append_chat(msg) {
     // Get the user's ID and username
     const uid = msg.author;
-    const user = userData[uid];
+    var user = userData[uid];
+
+    if (!user) {
+        console.log('Unknown user:', uid);
+        console.log('Using default');
+        user = {
+            name: 'Unknown',
+            icon: 'images/default_avatar.png'
+        };
+    }
 
     // Render markdown content
     const renderedHtml = md.render(msg.content);

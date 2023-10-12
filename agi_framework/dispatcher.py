@@ -37,7 +37,7 @@ def trunc_repr(value:Any, max_len:int=30) -> str:
         case list():
             if len(value) > 3:
                 value = value[:3] + [...]
-            return f'[{", ".join([trunc_repr(v, item_max_len) for v in value[:3]])}]'
+            return f'[{", ".join([trunc_repr(v, item_max_len) for v in value])}]'
         case tuple():
             if len(value) > 3:
                 value = value[:3] + (...,)
@@ -66,11 +66,18 @@ class Protocol:
 
     protocol_id: str = ''
 
+    @property
+    def is_server(self) -> bool:
+        'True if this protocol is a server'
+        return self._root.is_server
+
     def __init__(self):
         super().__init__()
         self.parent: 'Protocol' = None
         self.children: List['Protocol'] = []
         self.exception = Exception
+        self.tasks = []
+        self.running = False
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
 
@@ -135,6 +142,10 @@ class Protocol:
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
 
+        if self.running:
+            task = asyncio.create_task(protocol.arun())
+            self.tasks.append(task)
+
     def add_protocols(self, *protocols: "Protocol"):
         for p in protocols:
             self.add_protocol(p)
@@ -146,7 +157,7 @@ class Protocol:
         self.exception = exception
 
     async def arun(self):
-        pass
+        self.running = True
 
     async def aclose(self):
         pass
@@ -163,11 +174,13 @@ class Protocol:
 
         if cmd_handlers:
             for handler in cmd_handlers:
+                response = None
                 try:
-                    await handler(**kwargs)
+                    response = response or await handler(**kwargs)
                 except self.exception as e:
                     logger.error(e)
                     raise
+            return response
         else:
             logger.warn(f"no handler for {self.protocol_id}:{cmd}")
 
@@ -182,30 +195,49 @@ class Protocol:
 
 
 class Dispatcher(Protocol):
-    '''
-    Base class for dispatchers
-    Manages connections and messaging via protocols
-    '''
+    @property
+    def is_server(self) -> bool:
+        'True if this protocol is a server'
+        return False
+
     def __init__(self):
         super().__init__()
+        self.stop_event = asyncio.Event()
+
+    def create_task(self, coro: Awaitable[None]) -> asyncio.Task:
+        task = asyncio.create_task(coro)
+        self.tasks.append(task)
+        return task
+
+    async def arun(self):
+        'run the dispatcher in additive async mode (concurrent dispatchers use arun()).'
+        self.running = True
+
+        # Start all registered async run methods concurrently
+        for p in self.children:
+            self.create_task(p.arun())
+
+        # Wait for the stop signal
+        await self.stop_event.wait()
+
+    async def aclose(self):
+        'close all subtasks concurrently'
+        close_tasks = [asyncio.create_task(p.aclose()) for p in self.children]
+        await asyncio.gather(*close_tasks)
+        self.running = False
 
     def run(self):
-        loop = asyncio.get_event_loop()
+        'run the dispatcher in the main thread forever - only one dispatcher should use run().'
         try:
-            loop.run_until_complete(self.arun())
+            asyncio.run(self.arun())
         except Exception as e:
             logger.error(e)
             raise
         finally:
-            loop.run_until_complete(self.aclose())
-            loop.close()
+            asyncio.run(self.aclose())
 
-    async def arun(self):
-        # Run all registered async run methods in parallel
-        await asyncio.gather(*(p.arun() for p in self.children))
-
-    async def aclose(self):
-        # Run all registered async close methods in parallel
-        await asyncio.gather(*(p.aclose() for p in self.children))
+    def stop(self):
+        'signal to stop the Dispatcher'
+        self.stop_event.set()
 
 
