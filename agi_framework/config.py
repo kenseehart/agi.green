@@ -4,7 +4,11 @@ from typing import Any, Dict
 import yaml
 from os import makedirs
 
+import logging
+
 _None = object()
+_data_dir: str = None
+logger = logging.getLogger(__name__)
 
 def set_data_dir(path: str):
     'set the data directory for the agi framework'
@@ -15,7 +19,11 @@ def set_data_dir(path: str):
 def get_data_dir() -> str:
     'get the data directory for the agi framework'
     global _data_dir
+    if _data_dir is None:
+        logger.error('data dir not set', stack_info=True)
+
     return _data_dir
+
 
 class Config():
     '''

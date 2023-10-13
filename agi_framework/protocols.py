@@ -13,6 +13,7 @@ from logging import getLogger, Logger
 import json
 import asyncio
 import aiofiles
+import logging
 
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
@@ -20,7 +21,7 @@ import aio_pika
 from aiohttp import web
 import openai
 
-from dispatcher import Protocol, format_call, logger
+from dispatcher import Protocol, format_call
 from config import Config
 
 from queue import Queue
@@ -28,6 +29,7 @@ from os.path import exists
 import ast
 
 here = dirname(__file__)
+logger = logging.getLogger(__name__)
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -324,7 +326,6 @@ class GPTChatProtocol(Protocol):
         'receive chat message from RabbitMQ'
         if author != self.uid:
             self.messages.append({"role": "user", "content": content})
-            # Schedule the synchronous OpenAI call to run in a thread executor
             task = asyncio.create_task(self.get_completion())
 
     async def get_completion(self):
