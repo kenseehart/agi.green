@@ -76,6 +76,9 @@ class WebSocketProtocol(Protocol):
                 return
             node_ws = node.get_protocol('ws')
             node_ws.socket = websocket
+
+            await node_ws.handle_mesg('connect')
+
             async for mesg in websocket:
                 data = json.loads(mesg)
                 await node_ws.handle_mesg(**data)
@@ -301,7 +304,7 @@ class GPTChatProtocol(Protocol):
             asyncio.create_task(self.request_key())
 
         self.messages = [
-            {"role": "system", "content": "You are a helpful assistant representing agi.green."},
+            {"role": "system", "content": "You are a helpful assistant."},
         ]
 
         if api_key:
@@ -321,6 +324,9 @@ class GPTChatProtocol(Protocol):
         self.config.set('openai.key', key)
         self.messages.append({"role": "system", "content": "OpenAI API key was just now set by the user."})
         await self.get_completion()
+
+    async def on_ws_connect(self):
+        await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='images/bot.png')
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'

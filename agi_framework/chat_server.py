@@ -17,9 +17,9 @@ from config import Config
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
 
-def get_uid():
+def get_uid(digits=12):
     'generate a unique id: random 12 digit hex'
-    return '%012x' % random.randrange(16**12)
+    return '%012x' % random.randrange(16**digits)
 
 class ChatServer(Dispatcher):
     '''Main server for chat (spawns ChatNode for each user on ws connect)
@@ -55,7 +55,7 @@ class ChatServer(Dispatcher):
         'handle new websocket connection'
         # create a new ChatNode for this user
         node = self.node_class(self, root=self.root, port=self.port, rabbitmq_host=self.config['rabbitmq']['host'])
-        self.nodes[node.uid] = node
+        self.nodes[node.username] = node
         self.create_task(node.arun())
         return node
 
@@ -66,7 +66,6 @@ class ChatNode(Dispatcher):
     handler methods are named on_<protocol>_<cmd> where protocol is mq or ws
     mq = RabbitMQ
     ws = WebSocket
-    gpt = OpenAI Rest API
     cmd = Command line interface
 
     This represents a single connection to a browser for one user.
@@ -76,7 +75,7 @@ class ChatNode(Dispatcher):
     def __init__(self, server:ChatServer, root:str='.', port:int=8000, rabbitmq_host:str='localhost'):
         super().__init__()
         self.server = server
-        self.uid = get_uid()
+        self.username = f'guest_{get_uid(8)}'
         self.root = root
         self.port = port
         self.config = Config(
@@ -84,27 +83,25 @@ class ChatNode(Dispatcher):
             join(here, 'agi_config_default.yaml'),
         )
 
-        self.ws = WebSocketProtocol(self.uid)
+        self.ws = WebSocketProtocol(self.username)
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
-        self.gpt = GPTChatProtocol(self.config)
         self.cmd = CommandProtocol(self.config)
 
         self.add_protocols(
             self.ws,
             self.mq,
-            self.gpt,
             self.cmd,
         )
-        logger.info(f'ChatNode {self.uid} created')
+        logger.info(f'ChatNode {self.username} created')
 
     async def on_ws_connect(self):
         'post connection node setup'
-        ...
+        logger.info(f'ChatNode {self.username} connected')
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
         # broadcast to all (including sender, which will echo back to browser)
-        await self.send('mq', 'chat', author=f'K12345', content=content)
+        await self.send('mq', 'chat', author=self.username, content=content)
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
@@ -113,7 +110,14 @@ class ChatNode(Dispatcher):
     async def on_cmd_user_info(self, **kwargs):
         'receive user info'
 
+class ChatGPTNode(ChatNode):
+    '''ChatNode with GPT-4 joining in.
 
+    '''
+    def __init__(self, server:ChatServer, root:str='.', port:int=8000, rabbitmq_host:str='localhost'):
+        super().__init__(server, root, port, rabbitmq_host)
+        self.gpt = GPTChatProtocol(self.config)
+        self.add_protocol(self.gpt)
 
 def main():
     default_rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
@@ -122,6 +126,7 @@ def main():
                         help="port to serve ui (websocket will be port+1)")
     parser.add_argument("-d", "--debug", action="store_true", help="enable vscode debug attach")
     parser.add_argument("-D", "--docker", action="store_true", help="run in docker mode")
+    parser.add_argument("-g", "--gpt", action="store_true", help="enable gpt4 chat")
     args = parser.parse_args()
 
     if args.port %2 != 0:
@@ -138,7 +143,9 @@ def main():
         ptvsd.wait_for_attach()
         logger.info(".. debugger attached")
 
-    dispatcher = ChatServer(root=dirname(abspath(__file__)), port=args.port)
+    node_class=ChatGPTNode if args.gpt else ChatNode
+
+    dispatcher = ChatServer(root=dirname(abspath(__file__)), port=args.port, node_class=node_class)
     dispatcher.run()
 
 if __name__ == "__main__":

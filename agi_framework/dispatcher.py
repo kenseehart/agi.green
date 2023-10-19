@@ -180,8 +180,7 @@ class Protocol:
                 try:
                     response = response or await handler(**kwargs)
                 except self.exception as e:
-                    logger.error(e)
-                    raise
+                    logger.error(e, exc_info=True)
             return response
         else:
             logger.warn(f"no handler for {self.protocol_id}:{cmd}")
@@ -205,6 +204,7 @@ class Dispatcher(Protocol):
     def __init__(self):
         super().__init__()
         self.stop_event = asyncio.Event()
+
 
     def create_task(self, coro: Awaitable[None]) -> asyncio.Task:
         task = asyncio.create_task(coro)
