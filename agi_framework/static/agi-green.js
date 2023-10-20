@@ -8,7 +8,7 @@ const md = markdownit({
     // Enable HTML in the markdown source
     html: true,
     linkify: true, // Autoconvert URL-like text to links
-    typographer: true, // Enable smart quotes and other typographic substitutions
+    typographer: false, // Enable smart quotes and other typographic substitutions
 
     // Use highlight.js for syntax highlighting
     highlight: function (str, lang) {
@@ -83,7 +83,7 @@ function on_ws_append_chat(msg) {
         console.log('Unknown user:', uid);
         console.log('Using default');
         user = {
-            name: 'Unknown',
+            name: uid,
             icon: 'images/default_avatar.png'
         };
     }

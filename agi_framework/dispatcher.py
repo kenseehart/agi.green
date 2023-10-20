@@ -178,7 +178,7 @@ class Protocol:
             for handler in cmd_handlers:
                 response = None
                 try:
-                    response = response or await handler(**kwargs)
+                    response = await handler(**kwargs) or response
                 except self.exception as e:
                     logger.error(e, exc_info=True)
             return response

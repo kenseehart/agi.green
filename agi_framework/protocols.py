@@ -327,6 +327,7 @@ class GPTChatProtocol(Protocol):
 
     async def on_ws_connect(self):
         await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='images/bot.png')
+        await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='images/bot.png')
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
@@ -352,7 +353,7 @@ class GPTChatProtocol(Protocol):
             return f'<span style="color:red">{msg}</span>'
 
 
-re_command = re.compile(r'''!(\w+\((['"=\w, ]*)\))''')
+re_command = re.compile(r'''^!(\w+\(([^)]*)\))''')
 
 
 class CommandProtocol(Protocol):
@@ -370,7 +371,7 @@ class CommandProtocol(Protocol):
     async def arun(self):
         pass
 
-    async def on_mq_chat(self, author:str, content:str):
+    async def on_ws_chat_input(self, content:str):
         'receive command syntax on the mq chat channel'
 
         for match in re_command.finditer(content):
