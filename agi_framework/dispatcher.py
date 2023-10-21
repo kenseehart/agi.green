@@ -11,6 +11,8 @@ from collections import defaultdict
 from typing import Callable, Awaitable, Dict, Any, Tuple, List
 from types import MethodType
 import logging
+import inspect
+from functools import wraps
 
 if '-D' in sys.argv:
     log_format = '%(name)s - %(levelname)s - %(message)s'
@@ -63,6 +65,36 @@ def format_method(method: MethodType) -> str:
     return f"{method.__qualname__}({args})"
 
 
+def add_kwargs(func):
+    '''Wrapper function to discard extra kwargs
+    - make usage of any keword argument optional without explicit **kwargs
+    - support backwards compatibility for message handlers when new kwargs are added
+    '''
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        # Extract only the valid kwargs based on the original function's signature
+        sig = inspect.signature(func)
+        valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+        return func(*args, **valid_kwargs)
+
+    # Modify the wrapper function's signature to include **kwargs
+    sig = inspect.signature(func)
+
+    # Check if the function already has a variable keyword argument
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        return func
+
+    kwargs_param = inspect.Parameter('__kwargs', inspect.Parameter.VAR_KEYWORD)
+    new_sig = sig.replace(parameters=list(sig.parameters.values()) + [kwargs_param])
+    wrapped.__signature__ = new_sig
+
+    logger.debug(f'added **kwargs to {format_method(func)}')
+
+    return wrapped
+
+class IgnoreException(Exception):
+    pass
+
 class Protocol:
     _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
@@ -99,15 +131,17 @@ class Protocol:
             ch._register_methods()
 
         # Register methods with the "on_" prefix
-        for key in dir(self.__class__):
+        for key in dir(self):
             m = re_on_cmd.match(key)
             if m:
                 method = getattr(self, key)
                 if isinstance(method, MethodType):
                     proto, cmd = m.groups()
                     if method not in registry[proto][cmd]:
+                        setattr(self.__class__, key, add_kwargs(getattr(self.__class__, key)))
+                        method = getattr(self, key)
                         registry[proto][cmd].append(method)
-                        logger.info(f'Registered {proto}:{cmd} => {format_method(method)}')
+                        logger.debug(f'Registered {proto}:{cmd} => {format_method(method)}')
 
 
     @property
