@@ -204,8 +204,9 @@ class RabbitMQProtocol(Protocol):
         self.connection: aio_pika.Connection = None
         self.channel: aio_pika.Channel = None
         self.exchange: aio_pika.Exchange = None
-        self.queue: aio_pika.Queue = None
+        self.queues: Dict[str, aio_pika.Queue] = {}  # Store queues per channel
         self.offline_queue: Queue = Queue() # queue for messages pending connection
+        self.offline_subscription_queue: Queue = Queue() # queue for subscriptions pending connection
         self.connected = False
 
     async def arun(self):
@@ -217,55 +218,75 @@ class RabbitMQProtocol(Protocol):
             return
 
         self.channel = await self.connection.channel()
-
-        # Declare a fanout exchange
-        self.exchange = await self.channel.declare_exchange('chat', aio_pika.ExchangeType.FANOUT)
-
-        # Declare a queue with a random name, exclusive to this connection
-        self.queue = await self.channel.declare_queue(exclusive=True)
-
-        # Bind the queue to the exchange, to receive all messages
-        await self.queue.bind(self.exchange)
+        self.exchange = await self.channel.declare_exchange('agi.green', aio_pika.ExchangeType.DIRECT)
         self.connected = True
 
         logger.info(f'Connected to RabbitMQ on {self.host}:{self.port}')
 
-        # Send any pending messages
-        for cmd, kwargs in self.offline_queue.queue:
-            await self.do_send(cmd, **kwargs)
+        # Do any pending subscriptions
+        while not self.offline_subscription_queue.empty():
+            channel_id = self.offline_subscription_queue.get()
+            await self.subscribe(channel_id)
 
-        await self.receive_mq_mesg(),
+        # Send any pending messages
+        while not self.offline_queue.empty():
+            cmd, ch, kwargs = self.offline_queue.get()
+            await self.do_send(cmd, ch, **kwargs)
+
 
     async def aclose(self):
         # Close the RabbitMQ channel and connection
+        for channel_id in self.queues:
+            await self.unsubscribe(channel_id)
+
         if self.channel:
             await self.channel.close()
             await self.connection.close()
 
-    async def do_send(self, cmd:str, **kwargs):
+    async def listen_to_queue(self, channel_id, queue):
+        async with queue.iterator() as queue_iter:
+            async for message in queue_iter:
+                async with message.process():
+                    data = json.loads(message.body.decode())
+                    if data == '__terminate__':
+                        break
+                    await self.handle_mesg(channel_id=channel_id, **data)
+
+        logger.info(f'{self._root.username} unsubscribed from {channel_id}')
+
+    async def subscribe(self, channel_id: str):
+        if not self.connected:
+            self.offline_subscription_queue.put(channel_id)
+            return
+
+        if channel_id not in self.queues:
+            queue = await self.channel.declare_queue(exclusive=True)
+            await queue.bind(self.exchange, routing_key=channel_id)
+            self.queues[channel_id] = queue
+            logger.info(f'{self._root.username} subscribed to {channel_id}')
+
+            asyncio.create_task(self.listen_to_queue(channel_id, queue))
+
+    async def unsubscribe(self, channel_id: str):
+        queue = self.queues.pop(channel_id, None)
+        if queue:
+            await queue.unbind(self.exchange, routing_key=channel_id)
+            await queue.put(aio_pika.Message(body=json.dumps('__terminate__').encode()))
+            await queue.delete()
+
+    async def do_send(self, cmd: str, channel: str, **kwargs):
         'broadcast message to RabbitMQ'
         if not self.connected:
-            self.offline_queue.put((cmd, kwargs))
+            self.offline_queue.put((cmd, channel, kwargs))
             return
 
         kwargs['cmd'] = cmd
 
-        if not self.exchange:
-            self.offline_queue.append(kwargs)
-            return
-
         await self.exchange.publish(
             aio_pika.Message(body=json.dumps(kwargs).encode()),
-            routing_key='',  # ignored for fanout exchanges
+            routing_key=channel  # We use routing key as channel_id for direct exchanges
         )
 
-    async def receive_mq_mesg(self):
-        'receive messages from RabbitMQ'
-        async with self.queue.iterator() as queue_iter:
-            async for message in queue_iter:
-                async with message.process():
-                    data = json.loads(message.body.decode())
-                    await self.handle_mesg(**data)
 
 
 openai_key_request = '''

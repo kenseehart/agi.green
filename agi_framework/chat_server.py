@@ -97,12 +97,15 @@ class ChatNode(Dispatcher):
     async def on_ws_connect(self):
         'post connection node setup'
         logger.info(f'ChatNode {self.username} connected')
+        await self.mq.subscribe('broadcast')
+        await self.mq.subscribe('chat.public')
+        self.active_channel = 'chat.public'
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
         # broadcast to all (including sender, which will echo back to browser)
         if not content.startswith('!'):
-            await self.send('mq', 'chat', author=self.username, content=content)
+            await self.send('mq', 'chat', channel=self.active_channel, author=self.username, content=content)
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
