@@ -50,16 +50,23 @@ class WebSocketProtocol(Protocol):
     '''
     protocol_id: str = 'ws'
 
-    def __init__(self, host:str='0.0.0.0', port:int=8000, **kwargs):
+    def __init__(self, host:str='0.0.0.0', port:int=8001, **kwargs):
         super().__init__(**kwargs)
         self.host = host
         self.port = port
         self.socket = None
+        if host=='localhost':
+            self.origins = [f'http://localhost:{port-1}']
+        else:
+            self.origins = None
 
     async def arun(self):
         if self.is_server:
             self.connected = set()
-            await websockets.serve(self.handle_connection, self.host, self.port)
+            await websockets.serve(
+                self.handle_connection, self.host, self.port,
+                origins=self.origins,
+                )
 
     async def aclose(self):
         # Close all WebSocket connections
@@ -67,13 +74,20 @@ class WebSocketProtocol(Protocol):
             await ws.close()
         self.connected.clear()
 
-    async def handle_connection(self, websocket, path):
+    async def handle_connection(self, websocket: WebSocketServerProtocol, path):
         'Register websocket connection and redirect messages to the node instance'
+        # Set CORS headers
+#        origin = websocket.request_headers.get('Origin')
+
+#        if origin in ['http://localhost:8000']:  # Adjust this as per your requirements
+#            logger.info(f'Allowing CORS for {origin}')
+#            websocket.response_headers.append(('Access-Control-Allow-Origin', origin))
+
         self.connected.add(websocket)
         try:
             node:Protocol = await self.handle_mesg('connect')
-            if node is None:
-                logger.error('No node returned from on_ws_connect')
+            if not isinstance(node, Protocol):
+                logger.error('No Protocol node returned from on_ws_connect')
                 return
             node_ws = node.get_protocol('ws')
             node_ws.socket = websocket
@@ -168,6 +182,7 @@ class HTTPProtocol(Protocol):
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, self.host, self.port)
+        logger.info(f'Serving http://{self.host}:{self.port}')
         await self.site.start()
 
     async def aclose(self):

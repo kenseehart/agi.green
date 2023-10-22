@@ -1,13 +1,19 @@
 # agi.green
-A user interface platform for python AI applications using docker and a browser chat interface featuring markdown content. 
+A user interface platform for python AI chat applications browser chat interface featuring markdown content and a unified messaging framework.
 
 A high level python package controls all of the business logic, including a unified message model and asynchronous interaction with the chat ui.
 
-**Please note:** *This is in very early development (August 2003). The framework should be considered completely unstable for a few weeks, with no backward compatibility or versioning.* By September, we should be stable enough to support derivative works, and there will be a Github Template to facilitate deploying `agi.green` as a git submodule.
+**Please note:** *This is in somewhat early development (October 2003). The framework should be considered unstable for a few weeks.*
+
+Previous git submodule and template approach was abandoned.
+Instead the preferred strategy is to install the agi.green repo with pip.
+
+## Dependencies:
+
+- rabbitmq: https://www.rabbitmq.com/download.html
 
 ## Components:
 
-- `docker`: Peers are deployed as a docker containers
 - `websockets`: Communicate with browser ui
 - `aio_pika`: Communicate via `AMQP` with other docker containers
 - `markdown`: Messages are rendered as markdown (and plugins such as mermaid and mathjax)

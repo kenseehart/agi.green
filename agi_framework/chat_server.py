@@ -41,7 +41,7 @@ class ChatServer(Dispatcher):
             join(here, 'agi_config_default.yaml'),
         )
 
-        self.http = HTTPProtocol(root=root, port=port, nocache=True)
+        self.http = HTTPProtocol(root=root, host=host, port=port, nocache=True)
         self.ws = WebSocketProtocol(host=host, port=port+1)
 
         self.add_protocols(

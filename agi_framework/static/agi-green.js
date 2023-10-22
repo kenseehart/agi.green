@@ -2,7 +2,19 @@
 // Get HTTP protocol (http or https)
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const host = window.location.hostname;
-const socket = new WebSocket(`${protocol}//${host}/ws/`);
+const port = window.location.port;
+
+var ws_host;
+if (host === 'localhost') {
+    // Use port+1 when running locally (server will handle CORS)
+    ws_host = `${protocol}//${host}:${parseInt(port)+1}`;
+}
+else {
+    // Use port 443 when running on the server and append /ws/ to the path
+    ws_host = `${protocol}//${host}/ws/`;
+}
+console.log('ws_host:', ws_host);
+const socket = new WebSocket(ws_host);
 
 const md = markdownit({
     // Enable HTML in the markdown source
