@@ -21,8 +21,8 @@ import aio_pika
 from aiohttp import web
 import openai
 
-from dispatcher import Protocol, format_call
-from config import Config
+from agi_framework.dispatcher import Protocol, format_call
+from agi_framework.config import Config
 
 from queue import Queue
 from os.path import exists
@@ -50,15 +50,16 @@ class WebSocketProtocol(Protocol):
     '''
     protocol_id: str = 'ws'
 
-    def __init__(self, port:int=8000, **kwargs):
+    def __init__(self, host:str='0.0.0.0', port:int=8000, **kwargs):
         super().__init__(**kwargs)
+        self.host = host
         self.port = port
         self.socket = None
 
     async def arun(self):
         if self.is_server:
             self.connected = set()
-            await websockets.serve(self.handle_connection, '0.0.0.0', self.port)
+            await websockets.serve(self.handle_connection, self.host, self.port)
 
     async def aclose(self):
         # Close all WebSocket connections
@@ -100,9 +101,10 @@ class HTTPProtocol(Protocol):
     '''
     protocol_id: str = 'http'
 
-    def __init__(self, root:str, port:int=8000, nocache=False, **kwargs):
+    def __init__(self, root:str, host:str='0.0.0.0', port:int=8000, nocache=False, **kwargs):
         super().__init__(**kwargs)
         self.root = root
+        self.host = host
         self.port = port
         self.app:web.Application = None
         self.runner:web.AppRunner = None
@@ -165,7 +167,7 @@ class HTTPProtocol(Protocol):
         self.app.router.add_get('/', self.handle_static, name='index')
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
-        self.site = web.TCPSite(self.runner, '0.0.0.0', self.port)
+        self.site = web.TCPSite(self.runner, self.host, self.port)
         await self.site.start()
 
     async def aclose(self):

@@ -5,9 +5,9 @@ import argparse
 import random
 import logging
 
-from dispatcher import Dispatcher
-from protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
-from config import Config
+from agi_framework.dispatcher import Dispatcher
+from agi_framework.protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
+from agi_framework.config import Config
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -31,7 +31,7 @@ class ChatServer(Dispatcher):
         'True if this protocol is a server (default: False)'
         return True
 
-    def __init__(self, root:str='.', port:int=8000, node_class=None):
+    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, node_class=None):
         super().__init__()
         self.node_class = node_class or ChatNode
         self.root = root
@@ -42,7 +42,7 @@ class ChatServer(Dispatcher):
         )
 
         self.http = HTTPProtocol(root=root, port=port, nocache=True)
-        self.ws = WebSocketProtocol(port=port+1)
+        self.ws = WebSocketProtocol(host=host, port=port+1)
 
         self.add_protocols(
             self.http,
@@ -126,6 +126,8 @@ class ChatGPTNode(ChatNode):
 def main():
     default_rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
     parser = argparse.ArgumentParser()
+    parser.add_argument("-H", "--host", default='0.0.0.0', type=str,
+                        help="host to serve website")
     parser.add_argument("-p", "--port", default=8000, type=int,
                         help="port to serve ui (websocket will be port+1)")
     parser.add_argument("-d", "--debug", action="store_true", help="enable vscode debug attach")
