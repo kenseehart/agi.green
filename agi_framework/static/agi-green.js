@@ -14,7 +14,23 @@ else {
     ws_host = `${protocol}//${host}/ws/`;
 }
 console.log('ws_host:', ws_host);
-const socket = new WebSocket(ws_host);
+
+var socket;
+try {
+    socket = new WebSocket(ws_host);
+    console.log('WebSocket created:', socket);
+}
+catch (e) {
+    console.log('Error creating WebSocket:', e);
+}
+
+socket.onerror = function(event) {
+    console.error("WebSocket error observed:", event);
+};
+
+socket.onopen = function(event) {
+    console.log("WebSocket connection established", event);
+};
 
 const md = markdownit({
     // Enable HTML in the markdown source
@@ -306,6 +322,10 @@ function onChatInput() {
 
 socket.onerror = function(event) {
     error(`WebSocket Error: ${event.message}`);
+    on_ws_append_chat({
+        author: 'System',
+        content: `A WebSocket error occurred. If you are using a VPN, it could be blocking this. Check your settings and refresh the page.`
+    })
 };
 
 socket.onclose = function(event) {
