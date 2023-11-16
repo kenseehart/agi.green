@@ -155,11 +155,24 @@ class HTTPProtocol(Protocol):
         content_type = text_content_types.get(ext, None) # None means binary
 
         if content_type == 'text/markdown':
-            # Preprocess the .md file
-            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
-                content = await f.read()
-                # Preprocess the content here
-                return web.Response(text=content, content_type=content_type)
+            format = request.query.get('view', 'raw')
+
+            if format == 'raw':
+                return web.FileResponse(file_path)
+
+            if not os.path.exists(file_path) or not os.path.isfile(file_path):
+                raise web.HTTPNotFound()
+
+            with open(join(here,'md_template.html'), 'r') as template_file:
+                template = template_file.read()
+
+            for key, value in self.substitutions.items():
+                template = template.replace(key, value)
+
+            template = template.replace('__MD_FILE__', filename)
+            template = template.replace('__MD_VIEW__', format)
+
+            return web.Response(text=template, content_type='text/html')
 
         # If substitutions are required for textual files
         elif content_type is not None:

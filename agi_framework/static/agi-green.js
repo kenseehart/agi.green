@@ -126,30 +126,39 @@ function on_ws_append_chat(msg) {
 
     // Process MathJax (if necessary)
     window.MathJax.typesetPromise([newMessage]);
-
+    
     // Scroll to the bottom of the messages
     messages.scrollTop = messages.scrollHeight;
 }
 
-function on_ws_update_md_content(msg) {
-    // Update the markdown content
+function fetchAndRenderMarkdown() {
+    const mdDiv = document.getElementById('md-div');
     const mdSource = document.getElementById('md-source');
-    setTextWithNewlines(mdSource, msg.content);
-    autoResize.call(mdSource);
-    const renderedContent = md.render(msg.content)
     const mdRendered = document.getElementById('md-render');
-    mdRendered.innerHTML = renderedContent;
-    autoResize.call(mdRendered);
-    mermaid.init(undefined, mdRendered.querySelectorAll('.language-mermaid'));
-    window.MathJax.typesetPromise([mdRendered]);
-
-    if (msg.format === 'source') {
-        showSource();
-    }
-    else {
-        showRendered();
-    }
+    const filename = mdDiv.getAttribute('data-src');
+    const view = mdDiv.getAttribute('data-view');
+    console.log('filename:', filename, 'view:', view);
+    fetch(filename+ '?t=' + new Date().getTime()) // fetch the markdown source
+        .then(response => response.text())
+        .then(text => {
+            setTextWithNewlines(mdSource, text);
+            autoResize.call(mdSource);
+            const renderedContent = md.render(text)
+            mdRendered.innerHTML = renderedContent;
+            autoResize.call(mdRendered);
+            mermaid.init(undefined, mdRendered.querySelectorAll('.language-mermaid'));
+            window.MathJax.typesetPromise([mdRendered]);
+            if (view === 'source') {
+                showSource();
+            }
+            else {
+                showRendered();
+            }
+        });
 }
+
+fetchAndRenderMarkdown();
+
 
 // Workspace injection
 // Add a web component to the workspace
@@ -347,14 +356,7 @@ function showRendered() {
 }
 
 function onWSConnected() {
-    if (document.getElementById('md-source')) {
-
-        showRendered();
-
-        console.log('requesting md content cmd');
-
-        send_ws('request_md_content');
-    }
+    console.log('onWSConnected()');
 }
 
 const vsplitter = document.getElementById('vsplitter');
