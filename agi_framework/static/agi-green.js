@@ -126,13 +126,16 @@ function on_ws_append_chat(msg) {
 
     // Process MathJax (if necessary)
     window.MathJax.typesetPromise([newMessage]);
-    
+
     // Scroll to the bottom of the messages
     messages.scrollTop = messages.scrollHeight;
 }
 
 function fetchAndRenderMarkdown() {
     const mdDiv = document.getElementById('md-div');
+    if (!mdDiv) {
+        return;
+    }
     const mdSource = document.getElementById('md-source');
     const mdRendered = document.getElementById('md-render');
     const filename = mdDiv.getAttribute('data-src');
