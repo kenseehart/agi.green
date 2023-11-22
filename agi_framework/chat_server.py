@@ -4,6 +4,7 @@ import sys
 import argparse
 import random
 import logging
+import asyncio
 
 from agi_framework.dispatcher import Dispatcher
 from agi_framework.protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
@@ -55,10 +56,18 @@ class ChatServer(Dispatcher):
         'handle new websocket connection'
         # create a new ChatNode for this user
         node = self.node_class(self, root=self.root, port=self.port, rabbitmq_host=self.config['rabbitmq']['host'])
-        self.nodes[node.username] = node
-        self.create_task(node.arun())
+        self.add_node(node)
+        asyncio.create_task(node.arun())
         return node
 
+    def add_node(self, node):
+        logger.info(f'{self} adding node {node} - {node.username}')
+        self.nodes[node.username] = node
+
+    def remove_node(self, node:'ChatNode'):
+        logger.info(f'{self} removing node {node} - {node.username}')
+        node.server = None
+        del self.nodes[node.username]
 
 class ChatNode(Dispatcher):
     '''
@@ -94,12 +103,21 @@ class ChatNode(Dispatcher):
         )
         logger.info(f'ChatNode {self.username} created')
 
+    def __del__(self):
+        logger.info(f'ChatNode {self.username} deleted')
+
     async def on_ws_connect(self):
         'post connection node setup'
         logger.info(f'ChatNode {self.username} connected')
         await self.mq.subscribe('broadcast')
         await self.mq.subscribe('chat.public')
         self.active_channel = 'chat.public'
+
+    async def on_ws_disconnect(self):
+        'post connection node cleanup'
+        logger.info(f'ChatNode {self.username} disconnected')
+        self.server.remove_node(self)
+        asyncio.create_task(self.aclose())
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'

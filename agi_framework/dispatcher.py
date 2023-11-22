@@ -5,6 +5,7 @@ dispatcher
 
 
 import sys
+import os
 import re
 import asyncio
 from collections import defaultdict
@@ -13,15 +14,19 @@ from types import MethodType
 import logging
 import inspect
 from functools import wraps
+import weakref
+import time
+import gc
+from typing import Iterator
 
 if '-D' in sys.argv:
     log_format = '%(name)s - %(levelname)s - %(message)s'
 else:
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-logging.basicConfig(level=logging.INFO, format=log_format)
-
 logger = logging.getLogger(__name__)
+log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
+logging.basicConfig(level=log_level, format=log_format)
 
 def trunc_repr(value:Any, max_len:int=30) -> str:
     'repr() with truncation approximatly to max_len'
@@ -95,6 +100,9 @@ def add_kwargs(func):
 class IgnoreException(Exception):
     pass
 
+
+_protocol_garbage_tracker = None
+
 class Protocol:
     _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
@@ -102,7 +110,9 @@ class Protocol:
 
     @property
     def is_server(self) -> bool:
-        'True if this protocol is a server'
+        'True if this protocol instance is a server'
+        if self is self._root:
+            return False
         return self._root.is_server
 
     def __init__(self):
@@ -110,7 +120,6 @@ class Protocol:
         self.parent: 'Protocol' = None
         self.children: List['Protocol'] = []
         self.exception = Exception
-        self.tasks = []
         self.running = False
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
@@ -142,7 +151,6 @@ class Protocol:
                         method = getattr(self, key)
                         registry[proto][cmd].append(method)
                         logger.debug(f'Registered {proto}:{cmd} => {format_method(method)}')
-
 
     @property
     def _root(self):
@@ -178,10 +186,6 @@ class Protocol:
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
 
-        if self.running:
-            task = asyncio.create_task(protocol.arun())
-            self.tasks.append(task)
-
     def add_protocols(self, *protocols: "Protocol"):
         for p in protocols:
             self.add_protocol(p)
@@ -196,10 +200,56 @@ class Protocol:
         self.running = True
 
     async def aclose(self):
-        pass
+        self.running = False
 
-    async def close(self):
-        pass
+        logger.info(f'closing: {self}')
+
+        if self.parent:
+            self.parent.children.remove(self)
+            self.parent = None
+
+        self._registered_methods_cache = None
+        self._registered_protocols_cache = None
+
+        obj_id = id(self)
+        _protocol_garbage_tracker[obj_id] = [weakref.ref(self, self._create_finalize_callback(obj_id)), time.time()]
+
+    @staticmethod
+    def _create_finalize_callback(obj_id):
+        def _finalize(ref):
+            del _protocol_garbage_tracker[obj_id]
+            logger.debug(f'finalizing: {obj_id}')
+        return _finalize
+
+    @staticmethod
+    def reveal_orphan(ref, indent='    '):
+        'Reveal orphaned protocols'
+        if isinstance(ref, weakref.ref):
+            orphan = ref()
+        else:
+            orphan = ref
+
+        if orphan is not None:
+            refs = gc.get_referrers(orphan)
+            for orphan_r in refs:
+                if isinstance(orphan_r, dict):
+                    for k, v in orphan_r.items():
+                        if v is orphan and not k.startswith('orphan'):
+                            logger.debug(f'{indent}ref: {orphan} dict key {k}')
+                            break
+                else:
+                    logger.debug(f'{indent}ref: {orphan} referrer {orphan_r}')
+
+    @staticmethod
+    async def scan_orphans():
+        'Scan for orphaned protocols'
+        while True:
+            await asyncio.sleep(1)
+            for k, v in _protocol_garbage_tracker.items():
+                if v[1] < time.time() - 2:
+                    logger.warn(f'orphaned protocol: {v[0]()}')
+                    Protocol.reveal_orphan(v[0])
+                    v[1] = time.time() + 30 # prevent repeated warnings for this orphan for 30 seconds
 
     async def handle_mesg(self, cmd:str, **kwargs):
         'receive message from any protocol and dispatch to registered handler'
@@ -239,28 +289,30 @@ class Dispatcher(Protocol):
         super().__init__()
         self.stop_event = asyncio.Event()
 
-
-    def create_task(self, coro: Awaitable[None]) -> asyncio.Task:
-        task = asyncio.create_task(coro)
-        self.tasks.append(task)
-        return task
-
     async def arun(self):
         'run the dispatcher in additive async mode (concurrent dispatchers use arun()).'
+        global _protocol_garbage_tracker
         self.running = True
+
+        asyncio.create_task(super().arun())
 
         # Start all registered async run methods concurrently
         for p in self.children:
-            self.create_task(p.arun())
+            asyncio.create_task(p.arun())
+
+        if _protocol_garbage_tracker is None:
+            _protocol_garbage_tracker = {}
+            asyncio.create_task(self.scan_orphans())
 
         # Wait for the stop signal
         await self.stop_event.wait()
 
     async def aclose(self):
         'close all subtasks concurrently'
+        await super().aclose()
         close_tasks = [asyncio.create_task(p.aclose()) for p in self.children]
         await asyncio.gather(*close_tasks)
-        self.running = False
+        self.stop()
 
     def run(self):
         'run the dispatcher in the main thread forever - only one dispatcher should use run().'

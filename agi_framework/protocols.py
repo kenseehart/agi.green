@@ -27,9 +27,12 @@ from agi_framework.config import Config
 from queue import Queue
 from os.path import exists
 import ast
+import gc
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
+log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
+logging.basicConfig(level=log_level)
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -61,6 +64,8 @@ class WebSocketProtocol(Protocol):
             self.origins = None
 
     async def arun(self):
+        asyncio.create_task(super().arun())
+
         if self.is_server:
             self.connected = set()
             await websockets.serve(
@@ -69,10 +74,13 @@ class WebSocketProtocol(Protocol):
                 )
 
     async def aclose(self):
-        # Close all WebSocket connections
-        for ws in self.connected:
-            await ws.close()
-        self.connected.clear()
+        await super().aclose()
+
+        if self.is_server:
+            # Close all WebSocket connections
+            for ws in self.connected:
+                await ws.close()
+            self.connected.clear()
 
     async def handle_connection(self, websocket: WebSocketServerProtocol, path):
         'Register websocket connection and redirect messages to the node instance'
@@ -97,8 +105,10 @@ class WebSocketProtocol(Protocol):
             async for mesg in websocket:
                 data = json.loads(mesg)
                 await node_ws.handle_mesg(**data)
+
         finally:
             # Unregister websocket connection
+            await node_ws.handle_mesg('disconnect')
             self.connected.remove(websocket)
 
     async def do_send(self, cmd:str, **kwargs):
@@ -189,6 +199,8 @@ class HTTPProtocol(Protocol):
 
     async def arun(self):
         # Serve static http content from index.html
+        asyncio.create_task(super().arun())
+
         self.app = web.Application()
         self.app.router.add_get('/{filename:.*}', self.handle_static)
         self.app.router.add_get('/', self.handle_static, name='index')
@@ -211,6 +223,9 @@ class HTTPProtocol(Protocol):
         # Finally, cleanup the AppRunner
         if self.runner:
             await self.runner.cleanup()
+
+        await super().aclose()
+
 
     async def on_ws_request_md_content(self):
         'request markdown content from browser via websocket'
@@ -240,6 +255,8 @@ class RabbitMQProtocol(Protocol):
         self.connected = False
 
     async def arun(self):
+        asyncio.create_task(super().arun())
+
         try:
             logger.info(f'Connecting to RabbitMQ on {self.host}:{self.port}')
             self.connection = await aio_pika.connect_robust(host=self.host, port=self.port)
@@ -266,22 +283,28 @@ class RabbitMQProtocol(Protocol):
 
     async def aclose(self):
         # Close the RabbitMQ channel and connection
-        for channel_id in self.queues:
-            await self.unsubscribe(channel_id)
+        await self.unsubscribe_all()
 
         if self.channel:
             await self.channel.close()
             await self.connection.close()
+
+        # terminate
+
+        await super().aclose()
 
     async def listen_to_queue(self, channel_id, queue):
         async with queue.iterator() as queue_iter:
             async for message in queue_iter:
                 async with message.process():
                     data = json.loads(message.body.decode())
-                    if data == '__terminate__':
-                        break
-                    await self.handle_mesg(channel_id=channel_id, **data)
+                    if data['cmd'] == 'unsubscribe':
+                        if data['sender_id'] == id(self):
+                            break
+                    else:
+                       await self.handle_mesg(channel_id=channel_id, **data)
 
+        del self.queues[channel_id]
         logger.info(f'{self._root.username} unsubscribed from {channel_id}')
 
     async def subscribe(self, channel_id: str):
@@ -298,11 +321,13 @@ class RabbitMQProtocol(Protocol):
             asyncio.create_task(self.listen_to_queue(channel_id, queue))
 
     async def unsubscribe(self, channel_id: str):
-        queue = self.queues.pop(channel_id, None)
-        if queue:
-            await queue.unbind(self.exchange, routing_key=channel_id)
-            await queue.put(aio_pika.Message(body=json.dumps('__terminate__').encode()))
-            await queue.delete()
+        await self.send('mq', 'unsubscribe', channel=channel_id, sender_id=id(self))
+
+    async def unsubscribe_all(self):
+        'unsubscribe to everything'
+        for channel_id in list(self.queues.keys()):
+            await self.unsubscribe(channel_id)
+
 
     async def do_send(self, cmd: str, channel: str, **kwargs):
         'broadcast message to RabbitMQ'
@@ -347,12 +372,13 @@ class GPTChatProtocol(Protocol):
         self.uid = 'bot'
 
     async def arun(self):
+        asyncio.create_task(super().arun())
+
         # Ensure the OpenAI client is authenticated
-        api_key = self.config.get('openai.key', None)
+        api_key = os.environ.get("OPENAI_API_KEY", None)
+
         if api_key is None:
-            logger.warn('Missing OpenAI API key in config')
-            # request api key
-            asyncio.create_task(self.request_key())
+            raise Exception("OPENAI_API_KEY environment variable must be set")
 
         self.messages = [
             {"role": "system", "content": "You are a helpful assistant."},
@@ -362,12 +388,6 @@ class GPTChatProtocol(Protocol):
             openai.api_key = api_key
         else:
             logger.warn('Missing OpenAI API key in config')
-            # request api key
-            asyncio.create_task(self.request_key())
-
-    async def request_key(self):
-        'request api key from browser'
-        await self.send('mq', 'chat', author=self.name, content=openai_key_request)
 
     async def on_ws_form_data(self, cmd:str, data:dict):
         key = data.get('key')
@@ -389,7 +409,7 @@ class GPTChatProtocol(Protocol):
     async def get_completion(self):
         loop = asyncio.get_event_loop()
         content = await loop.run_in_executor(None, self.sync_completion)
-        await self.send('mq', 'chat', author=self.uid, content=content)
+        await self.send('mq', 'chat', channel='chat.public', author=self.uid, content=content)
 
     def sync_completion(self):
         try:
@@ -420,7 +440,7 @@ class CommandProtocol(Protocol):
         self.config = config
 
     async def arun(self):
-        pass
+        asyncio.create_task(super().arun())
 
     async def on_ws_chat_input(self, content:str):
         'receive command syntax on the mq chat channel'

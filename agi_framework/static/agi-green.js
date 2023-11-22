@@ -480,6 +480,9 @@ function cartesianProduct(...arrays) {
 }
 
 function index_key(key, arr) {
+    // Index an array of objects by a key
+    // index_key('id', [{id: 1, name: 'foo'}, {id: 2, name: 'bar'}])
+    // -> {1: {id: 1, name: 'foo'}, 2: {id: 2, name: 'bar'}}
     return arr.reduce((acc, obj) => {
         if (obj[key]) {
             if (!acc[obj[key]]) {
