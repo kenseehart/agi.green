@@ -426,6 +426,25 @@ class GPTChatProtocol(Protocol):
 
 re_command = re.compile(r'''^!(\w+\(([^)]*)\))''')
 
+def ast_node_to_value(node):
+    if isinstance(node, ast.Constant):
+        # Handle atomic literals like numbers, strings, etc.
+        return node.value
+    elif isinstance(node, ast.List):
+        # Handle list literals
+        return [ast_node_to_value(element) for element in node.elts]
+    elif isinstance(node, ast.Tuple):
+        # Handle tuple literals
+        return tuple(ast_node_to_value(element) for element in node.elts)
+    elif isinstance(node, ast.Dict):
+        # Handle dict literals
+        return {ast_node_to_value(key): ast_node_to_value(value) for key, value in zip(node.keys, node.values)}
+    elif isinstance(node, ast.Set):
+        # Handle set literals
+        return {ast_node_to_value(element) for element in node.elts}
+    # Add more cases here for other compound types if needed
+    else:
+        raise TypeError("Unsupported AST node type")
 
 class CommandProtocol(Protocol):
     '''
@@ -445,19 +464,43 @@ class CommandProtocol(Protocol):
     async def on_ws_chat_input(self, content:str):
         'receive command syntax on the mq chat channel'
 
+        # !gameio_start(game='y93', players=['user1', 'user2'])
+
         for match in re_command.finditer(content):
             call_str = match.group(1)
 
-            # Parse the string as an expression using ast
-            try:
-                node = ast.parse(call_str, mode='eval').body
+            result = await self.send('cmd', call_str)
 
-                if isinstance(node, ast.Call):
-                    func_name = node.func.id
-                    kwargs = {kw.arg: kw.value.value for kw in node.keywords}
-                    await self.send('cmd', func_name, **kwargs)
+            if result:
+                await self.send('ws', 'append_chat', author='info', content=result)
 
-            except (SyntaxError, ValueError):
-                # This might occur if the matched string isn't a valid Python function call
-                logger.error(f'Invalid command syntax: {call_str}')
+    async def do_send(self, cmd:str, **kwargs):
+        # Parse cmd as a function call expression using ast
+        result = ''
+
+        try:
+            node = ast.parse(cmd, mode='eval').body
+
+            if isinstance(node, ast.Name):
+                return await super().do_send(cmd, **kwargs)
+
+            elif isinstance(node, ast.Call):
+                func_name = node.func.id
+                kwargs |= {kw.arg: ast_node_to_value(kw.value) for kw in node.keywords}
+                result = await self.send('cmd', func_name, **kwargs)
+            else:
+                result = f'error: Invalid command syntax: {cmd}'
+
+        except (SyntaxError, ValueError) as e:
+            # This might occur if the matched string isn't a valid Python function call
+            result = f'error: {e} `{cmd}`'
+
+        result = result or ''
+
+        if result.startswith('error'):
+            logger.error(result)
+        else:
+            logger.info('%s => "%s"', cmd, result)
+
+        return result
 
