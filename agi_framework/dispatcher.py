@@ -80,7 +80,19 @@ def add_kwargs(func):
         # Extract only the valid kwargs based on the original function's signature
         sig = inspect.signature(func)
         valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
-        return func(*args, **valid_kwargs)
+        # Check for signature match
+        try:
+            bound_args = sig.bind(*args, **valid_kwargs)
+            bound_args.apply_defaults()
+        except TypeError as e:
+            target_file = func.__code__.co_filename
+            target_line = func.__code__.co_firstlineno
+            func_signature = str(sig)
+            raise TypeError(f'Signature mismatch in call to {func.__qualname__}{func_signature} '
+                            f'File "{target_file}", line {target_line}: {e}')
+
+        # Call the function with valid arguments only
+        return func(*bound_args.args, **bound_args.kwargs)
 
     # Modify the wrapper function's signature to include **kwargs
     sig = inspect.signature(func)
