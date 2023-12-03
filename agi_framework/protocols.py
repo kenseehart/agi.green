@@ -14,6 +14,7 @@ import json
 import asyncio
 import aiofiles
 import logging
+import glob
 
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
@@ -154,9 +155,58 @@ class HTTPProtocol(Protocol):
                 return file_path
         return None
 
+    def find_static_glob(self, filename:str):
+        files = []
+        for static_dir in self.static:
+            file_path = os.path.join(static_dir, filename)
+            files.extend(glob.glob(file_path))
+        return files
+
+    def index_md(self):
+        index_file = join(self.static[:2][-1], 'docs', 'index.md')
+        files = self.find_static_glob('docs/*.md')
+        newest_file = max(files, key=os.path.getmtime)
+
+        if newest_file != index_file:
+            if index_file in files:
+                files.remove(index_file)
+            files.sort()
+
+            with open(index_file, 'w') as f:
+                f.write('| File | Description |\n')
+                f.write('| ---- | ----------- |\n')
+                for file in files:
+                    with open(file, 'r') as f2:
+                        s = f2.read()
+                        # find first markdown header
+                        m = re.search(r'^#+\s+(.*)', s, re.MULTILINE)
+                        if m:
+                            header = m.group(1)
+                            base = os.path.basename(file).replace('.md','')
+                            f.write(f'| [**{base}**](/docs/{base}) | *{header}* |\n')
+
+
+        if not exists(index_file):
+            return None
+        return index_file
+
     async def handle_static(self, request:web.Request):
         filename = request.match_info['filename'] or 'index.html'
-        file_path = self.find_static(filename)
+        query = request.query.copy()
+
+        if filename == 'docs':
+            file_path_md = self.index_md()
+            filename = 'docs/index'
+        else:
+            # check for filename+'.md' and serve that instead with query: view=render
+            file_path_md = self.find_static(filename+'.md')
+
+        if file_path_md is not None:
+            query.add('view','render')
+            file_path = file_path_md
+            filename = filename+'.md'
+        else:
+            file_path = self.find_static(filename)
 
         if file_path is None:
             return web.Response(status=404)
@@ -165,7 +215,7 @@ class HTTPProtocol(Protocol):
         content_type = text_content_types.get(ext, None) # None means binary
 
         if content_type == 'text/markdown':
-            format = request.query.get('view', 'raw')
+            format = query.get('view', 'raw')
 
             if format == 'raw':
                 return web.FileResponse(file_path)

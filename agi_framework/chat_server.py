@@ -36,6 +36,7 @@ class ChatServer(Dispatcher):
         super().__init__()
         self.node_class = node_class or ChatNode
         self.root = root
+        self.server = self
         self.port = port
         self.config = Config(
             join(here, 'agi_config.yaml'),
