@@ -3,7 +3,7 @@ implementation of ws, mq and http protocols
 '''
 
 import os
-from os.path import join, dirname
+from os.path import join, dirname, splitext, isabs
 import time
 import shutil
 import re
@@ -137,6 +137,7 @@ class HTTPProtocol(Protocol):
         self.md_content = None
         self.substitutions = {}
         self.static = [join(here, 'static')]
+        self.static_handlers:List[Callable] = []
 
         if nocache:
             # force browser to reload static content
@@ -147,6 +148,10 @@ class HTTPProtocol(Protocol):
         if not exists(path):
             logger.warn(f'Static directory {path}: does not exist')
         self.static.append(path)
+
+    def add_static_handler(self, handler:Callable):
+        'add static handler'
+        self.static_handlers.append(handler)
 
     def find_static(self, filename:str):
         for static_dir in self.static:
@@ -209,7 +214,12 @@ class HTTPProtocol(Protocol):
             file_path = self.find_static(filename)
 
         if file_path is None:
-            return web.Response(status=404)
+            for h in self.static_handlers:
+                file_path = h(filename)
+                if file_path is not None:
+                    break
+            else:
+                return web.HTTPNotFound()
 
         ext = os.path.splitext(filename)[1]
         content_type = text_content_types.get(ext, None) # None means binary
@@ -218,7 +228,7 @@ class HTTPProtocol(Protocol):
             format = query.get('view', 'raw')
 
             if format == 'raw':
-                return web.FileResponse(file_path)
+                return web.HTTPNotFound()
 
             if not os.path.exists(file_path) or not os.path.isfile(file_path):
                 raise web.HTTPNotFound()
