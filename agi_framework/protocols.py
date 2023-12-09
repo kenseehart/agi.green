@@ -228,7 +228,7 @@ class HTTPProtocol(Protocol):
             format = query.get('view', 'raw')
 
             if format == 'raw':
-                return web.HTTPNotFound()
+                return web.FileResponse(file_path)
 
             if not os.path.exists(file_path) or not os.path.isfile(file_path):
                 raise web.HTTPNotFound()
