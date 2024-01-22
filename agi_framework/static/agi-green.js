@@ -33,6 +33,7 @@ socket.onopen = function(event) {
 };
 
 const md = markdownit({
+
     // Enable HTML in the markdown source
     html: true,
     linkify: true, // Autoconvert URL-like text to links
@@ -49,6 +50,12 @@ const md = markdownit({
     }
   });
 
+  if (window.markdownitFootnote) {
+    md.use(window.markdownitFootnote);
+  }
+  else {
+    console.log('markdownitFootnote not found');
+  }
 
 function escapeHtml(text) {
     var map = {
