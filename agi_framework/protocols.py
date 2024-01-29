@@ -15,6 +15,7 @@ import asyncio
 import aiofiles
 import logging
 import glob
+import ssl
 
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
@@ -120,17 +121,18 @@ class WebSocketProtocol(Protocol):
 
 class HTTPProtocol(Protocol):
     '''
-    http server
+    http, https server
     Use port for http server
     Use port+1 for websocket port
     '''
     protocol_id: str = 'http'
 
-    def __init__(self, root:str, host:str='0.0.0.0', port:int=8000, nocache=False, **kwargs):
+    def __init__(self, root:str, host:str='0.0.0.0', port:int=8000, nocache=False, ssl_context=None, **kwargs):
         super().__init__(**kwargs)
         self.root = root
         self.host = host
         self.port = port
+        self.ssl_context = ssl_context
         self.app:web.Application = None
         self.runner:web.AppRunner = None
         self.site:web.TCPSite = None
@@ -267,8 +269,9 @@ class HTTPProtocol(Protocol):
         self.app.router.add_get('/', self.handle_static, name='index')
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
-        self.site = web.TCPSite(self.runner, self.host, self.port)
-        logger.info(f'Serving http://{self.host}:{self.port}')
+        self.site = web.TCPSite(self.runner, self.host, self.port, ssl_context=self.ssl_context)
+        prot = 'https' if self.ssl_context else 'http'
+        logger.info(f'Serving {prot}://{self.host}:{self.port}')
         await self.site.start()
 
     async def aclose(self):
