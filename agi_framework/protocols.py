@@ -124,14 +124,21 @@ class HTTPProtocol(Protocol):
     http, https server
     Use port for http server
     Use port+1 for websocket port
+
+    If ssl_context is provided, use https, and launch a http->https redirect server
+    Otherwise, use http
+
+    Either way, our naming convention assumes http (i.e. the class name and protocol_id)
     '''
+
     protocol_id: str = 'http'
 
-    def __init__(self, root:str, host:str='0.0.0.0', port:int=8000, nocache=False, ssl_context=None, **kwargs):
+    def __init__(self, root:str, host:str='0.0.0.0', port:int=8000, nocache=False, ssl_context=None, redirect=None, **kwargs):
         super().__init__(**kwargs)
         self.root = root
         self.host = host
         self.port = port
+        self.redirect = redirect
         self.ssl_context = ssl_context
         self.app:web.Application = None
         self.runner:web.AppRunner = None
@@ -144,6 +151,11 @@ class HTTPProtocol(Protocol):
         if nocache:
             # force browser to reload static content
             self.substitutions['__TIMESTAMP__'] = str(time.time())
+
+    async def http_to_https_redirect(self, request):
+        assert self.ssl_context is not None, "SSL context must be set for HTTPS redirect"
+        https_location = f'https://{request.host}{request.rel_url}'
+        raise web.HTTPMovedPermanently(https_location)
 
     def add_static(self, path:str):
         'add static directory'
@@ -261,18 +273,37 @@ class HTTPProtocol(Protocol):
         return web.FileResponse(file_path)
 
     async def arun(self):
-        # Serve static http content from index.html
         asyncio.create_task(super().arun())
 
         self.app = web.Application()
         self.app.router.add_get('/{filename:.*}', self.handle_static)
         self.app.router.add_get('/', self.handle_static, name='index')
-        self.runner = web.AppRunner(self.app)
-        await self.runner.setup()
-        self.site = web.TCPSite(self.runner, self.host, self.port, ssl_context=self.ssl_context)
-        prot = 'https' if self.ssl_context else 'http'
-        logger.info(f'Serving {prot}://{self.host}:{self.port}')
-        await self.site.start()
+
+        # Check if SSL context is provided for HTTPS
+        if self.ssl_context:
+            # HTTPS server setup
+            self.runner = web.AppRunner(self.app)
+            await self.runner.setup()
+            self.site = web.TCPSite(self.runner, self.host, self.port, ssl_context=self.ssl_context)
+            logger.info(f'Serving https://{self.host}:{self.port}')
+            await self.site.start()
+
+            if self.redirect:
+                # Additional HTTP server for redirecting to HTTPS
+                redirect_app = web.Application()
+                redirect_app.router.add_get('/{tail:.*}', self.http_to_https_redirect)
+                redirect_runner = web.AppRunner(redirect_app)
+                await redirect_runner.setup()
+                redirect_site = web.TCPSite(redirect_runner, self.host, self.redirect)
+                logger.info(f'Starting HTTP redirect server on http://{self.host}:{self.redirect}')
+                await redirect_site.start()
+        else:
+            # HTTP server setup
+            self.runner = web.AppRunner(self.app)
+            await self.runner.setup()
+            self.site = web.TCPSite(self.runner, self.host, self.port)
+            logger.info(f'Serving http://{self.host}:{self.port}')
+            await self.site.start()
 
     async def aclose(self):
         # Stop the aiohttp site

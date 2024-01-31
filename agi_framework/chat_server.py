@@ -22,6 +22,13 @@ def get_uid(digits=12):
     'generate a unique id: random 12 digit hex'
     return '%012x' % random.randrange(16**digits)
 
+def create_ssl_context(cert_file:str, key_file:str):
+    'create ssl context for https'
+    import ssl
+    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_context.load_cert_chain(cert_file, key_file)
+    return ssl_context
+
 class ChatServer(Dispatcher):
     '''Main server for chat (spawns ChatNode for each user on ws connect)
     To customize, you can start by replacing ChatNode with your own node class.
@@ -32,7 +39,7 @@ class ChatServer(Dispatcher):
         'True if this protocol is a server (default: False)'
         return True
 
-    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, node_class=None):
+    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, node_class=None, ssl_context=None, redirect=None):
         super().__init__()
         self.node_class = node_class or ChatNode
         self.root = root
@@ -43,7 +50,7 @@ class ChatServer(Dispatcher):
             join(here, 'agi_config_default.yaml'),
         )
 
-        self.http = HTTPProtocol(root=root, host=host, port=port, nocache=True)
+        self.http = HTTPProtocol(root=root, host=host, port=port, nocache=True, ssl_context=ssl_context, redirect=redirect)
         self.ws = WebSocketProtocol(host=host, port=port+1)
 
         self.add_protocols(
@@ -152,6 +159,7 @@ def main():
     parser.add_argument("-d", "--debug", action="store_true", help="enable vscode debug attach")
     parser.add_argument("-D", "--docker", action="store_true", help="run in docker mode")
     parser.add_argument("-g", "--gpt", action="store_true", help="enable gpt4 chat")
+    parser.add_argument("--http", action="store_true", help="use http (default is https)")
     args = parser.parse_args()
 
     if args.port %2 != 0:
@@ -170,8 +178,21 @@ def main():
 
     node_class=ChatGPTNode if args.gpt else ChatNode
 
+    if args.http:
+        ssl_context = None
+    else:
+        cert_file = os.environ.get('SSL_CERT', None)
+        key_file = os.environ.get('SSL_KEY', None)
+        if not cert_file or not key_file:
+            logger.info("SSL_CERT and SSL_KEY environment variables must be set for https mode", file=sys.stderr)
+            return 1
+
+        ssl_context = create_ssl_context(cert_file, key_file)
+
     dispatcher = ChatServer(root=dirname(abspath(__file__)), port=args.port, node_class=node_class)
     dispatcher.run()
+    return 0
 
 if __name__ == "__main__":
-    main()
+    r = main()
+    sys.exit(r)
