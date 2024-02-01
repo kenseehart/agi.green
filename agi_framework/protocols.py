@@ -17,10 +17,8 @@ import logging
 import glob
 import ssl
 
-import websockets
-from websockets.legacy.server import WebSocketServerProtocol
 import aio_pika
-from aiohttp import web
+from aiohttp import web, WSMsgType
 import openai
 
 from agi_framework.dispatcher import Protocol, format_call
@@ -55,69 +53,15 @@ class WebSocketProtocol(Protocol):
     '''
     protocol_id: str = 'ws'
 
-    def __init__(self, host:str='0.0.0.0', port:int=8001, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.host = host
-        self.port = port
         self.socket = None
-        if host=='localhost':
-            self.origins = [f'http://localhost:{port-1}']
-        else:
-            self.origins = None
-
-    async def arun(self):
-        asyncio.create_task(super().arun())
-
-        if self.is_server:
-            self.connected = set()
-            await websockets.serve(
-                self.handle_connection, self.host, self.port,
-                origins=self.origins,
-                )
-
-    async def aclose(self):
-        await super().aclose()
-
-        if self.is_server:
-            # Close all WebSocket connections
-            for ws in self.connected:
-                await ws.close()
-            self.connected.clear()
-
-    async def handle_connection(self, websocket: WebSocketServerProtocol, path):
-        'Register websocket connection and redirect messages to the node instance'
-        # Set CORS headers
-#        origin = websocket.request_headers.get('Origin')
-
-#        if origin in ['http://localhost:8000']:  # Adjust this as per your requirements
-#            logger.info(f'Allowing CORS for {origin}')
-#            websocket.response_headers.append(('Access-Control-Allow-Origin', origin))
-
-        self.connected.add(websocket)
-        try:
-            node:Protocol = await self.handle_mesg('connect')
-            if not isinstance(node, Protocol):
-                logger.error('No Protocol node returned from on_ws_connect')
-                return
-            node_ws = node.get_protocol('ws')
-            node_ws.socket = websocket
-
-            await node_ws.handle_mesg('connect')
-
-            async for mesg in websocket:
-                data = json.loads(mesg)
-                await node_ws.handle_mesg(**data)
-
-        finally:
-            # Unregister websocket connection
-            await node_ws.handle_mesg('disconnect')
-            self.connected.remove(websocket)
 
     async def do_send(self, cmd:str, **kwargs):
         'send ws message to browser via websocket'
         kwargs['cmd'] = cmd
-        if self.socket:
-            await self.socket.send(json.dumps(kwargs))
+        if self.socket is not None:
+            await self.socket.send_str(json.dumps(kwargs))
 
 class HTTPProtocol(Protocol):
     '''
@@ -151,6 +95,24 @@ class HTTPProtocol(Protocol):
         if nocache:
             # force browser to reload static content
             self.substitutions['__TIMESTAMP__'] = str(time.time())
+
+    async def handle_websocket_request(self, request):
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        ws_protocol = self.get_protocol('ws')
+        node:Protocol = await ws_protocol.handle_mesg('connect')
+        node.ws.socket = ws
+        await node.ws.handle_mesg('connect')
+
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                data = json.loads(msg.data)
+                # Handle the message
+                await node.ws.handle_mesg(**data)
+            elif msg.type == WSMsgType.ERROR:
+                logger.error('ws connection closed with exception %s' % ws.exception())
+
+        return ws
 
     async def http_to_https_redirect(self, request):
         assert self.ssl_context is not None, "SSL context must be set for HTTPS redirect"
@@ -276,6 +238,8 @@ class HTTPProtocol(Protocol):
         asyncio.create_task(super().arun())
 
         self.app = web.Application()
+        #handle_websocket_request
+        self.app.router.add_get('/ws', self.handle_websocket_request)  # Delegate WebSocket connections
         self.app.router.add_get('/{filename:.*}', self.handle_static)
         self.app.router.add_get('/', self.handle_static, name='index')
 
@@ -357,6 +321,7 @@ class RabbitMQProtocol(Protocol):
             self.connection = await aio_pika.connect_robust(host=self.host, port=self.port)
         except aio_pika.AMQPException as e:
             logger.error(f"RabbitMQ connection failed: {e}")
+            await self.send('ws', 'append_chat', author='info', content=f'We got an unexpected error.\n\nRabbitMQ connection failed: {e}')
             return
 
         self.channel = await self.connection.channel()

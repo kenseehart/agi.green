@@ -51,7 +51,7 @@ class ChatServer(Dispatcher):
         )
 
         self.http = HTTPProtocol(root=root, host=host, port=port, nocache=True, ssl_context=ssl_context, redirect=redirect)
-        self.ws = WebSocketProtocol(host=host, port=port+1)
+        self.ws = WebSocketProtocol()
 
         self.add_protocols(
             self.http,
@@ -100,7 +100,7 @@ class ChatNode(Dispatcher):
             join(here, 'agi_config_default.yaml'),
         )
 
-        self.ws = WebSocketProtocol(self.username)
+        self.ws = WebSocketProtocol()
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
         self.cmd = CommandProtocol(self.config)
 
@@ -110,6 +110,9 @@ class ChatNode(Dispatcher):
             self.cmd,
         )
         logger.info(f'ChatNode {self.username} created')
+
+    def __repr__(self):
+        return f'{super().__repr__()} {self.username}'
 
     def __del__(self):
         logger.info(f'ChatNode {self.username} deleted')
@@ -148,6 +151,7 @@ class ChatGPTNode(ChatNode):
         super().__init__(server, root, port, rabbitmq_host)
         self.gpt = GPTChatProtocol(self.config)
         self.add_protocol(self.gpt)
+
 
 def main():
     default_rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
