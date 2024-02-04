@@ -28,43 +28,6 @@ socket.onopen = function(event) {
     console.log("WebSocket connection established", event);
 };
 
-const md = markdownit({
-
-    // Enable HTML in the markdown source
-    html: true,
-    linkify: true, // Autoconvert URL-like text to links
-    typographer: false, // Enable smart quotes and other typographic substitutions
-
-    // Use highlight.js for syntax highlighting
-    highlight: function (str, lang) {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-            return hljs.highlight(str, {language: lang}).value;
-        } catch (__) {}
-      }
-      return ''; // Use external default escaping
-    }
-  });
-
-  if (window.markdownitFootnote) {
-    md.use(window.markdownitFootnote);
-  }
-  else {
-    console.log('markdownitFootnote not found');
-  }
-
-function escapeHtml(text) {
-    var map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;',
-        '\n': '<br>',
-    };
-
-    return text.replace(/[&<>"'\n]/g, function(m) { return map[m]; });
-}
 
 // Connection opened
 socket.addEventListener('open', (event) => {
@@ -149,37 +112,6 @@ function on_ws_append_chat(msg) {
     // Scroll to the bottom of the messages
     messages.scrollTop = messages.scrollHeight;
 }
-
-function fetchAndRenderMarkdown() {
-    const mdDiv = document.getElementById('md-div');
-    if (!mdDiv) {
-        return;
-    }
-    const mdSource = document.getElementById('md-source');
-    const mdRendered = document.getElementById('md-render');
-    const filename = mdDiv.getAttribute('data-src');
-    const view = mdDiv.getAttribute('data-view');
-    console.log('filename:', filename, 'view:', view);
-    fetch(filename+ '?t=' + new Date().getTime()) // fetch the markdown source
-        .then(response => response.text())
-        .then(text => {
-            setTextWithNewlines(mdSource, text);
-            autoResize.call(mdSource);
-            const renderedContent = md.render(text)
-            mdRendered.innerHTML = renderedContent;
-            autoResize.call(mdRendered);
-            mermaid.init(undefined, mdRendered.querySelectorAll('.language-mermaid'));
-            window.MathJax.typesetPromise([mdRendered]);
-            if (view === 'source') {
-                showSource();
-            }
-            else {
-                showRendered();
-            }
-        });
-}
-
-fetchAndRenderMarkdown();
 
 
 // Workspace injection
@@ -290,38 +222,6 @@ function resolve_ws_promise(promise) {
 }
 
 
-
-function error(msg) {
-    console.log('error:', msg);
-    const messages = document.getElementById('messages');
-    const newMessage = document.createElement('div');
-    newMessage.className = 'error';
-    newMessage.innerHTML = msg;
-    messages.appendChild(newMessage);
-}
-
-// Function to send messages to the server
-function onChatInput() {
-    console.log('onChatInput()');
-    const inputText = document.getElementById('chat-input-text');
-    const message = inputText.value.trim();
-    console.log('message:', message);
-    if (message !== '') {
-
-        if(socket.readyState === WebSocket.OPEN) {
-            send_ws('chat_input', {
-                content: message
-            });
-            inputText.value = '';  // Clear the input field
-        } else {
-            error('WebSocket is not open');
-        }
-        console.log('message sent:', message);
-
-        inputText.value = '';  // Clear the input field
-        autoResize.call(document.getElementById('chat-input-text'));
-    }
-}
 
 socket.onerror = function(event) {
     error(`WebSocket Error: ${event.message}`);
