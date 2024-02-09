@@ -109,6 +109,7 @@ class HTTPServerProtocol(Protocol):
         await session.ws.handle_mesg('connect')
 
         async for msg in socket:
+            logger.info(f'ws {msg.type}, {msg.data}')
             if msg.type == WSMsgType.TEXT:
                 data = json.loads(msg.data)
                 # Handle the message
@@ -314,6 +315,8 @@ class HTTPSessionProtocol(Protocol):
         return web.FileResponse(file_path)
 
 
+WS_PING_INTERVAL = 20
+
 class WebSocketProtocol(Protocol):
     '''
     Websocket session
@@ -322,8 +325,22 @@ class WebSocketProtocol(Protocol):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.socket = None
+        self.socket:web.WebSocketResponse = None
         self.pre_connect_queue = []
+
+    async def ping_loop(self):
+        'ping the websocket to keep it alive'
+        self.last_pong_time = time.time()
+
+        while self.socket is not None:
+            try:
+                await self.socket.ping()
+            except ConnectionResetError:
+                logger.error(f'ws ping error: {e}')
+                self.socket = None
+                break
+            await asyncio.sleep(WS_PING_INTERVAL)
+
 
     async def do_send(self, cmd:str, **kwargs):
         'send ws message to browser via websocket'
@@ -348,15 +365,12 @@ class WebSocketProtocol(Protocol):
                 kwargs = self.pre_connect_queue.pop(0)
                 await self.do_send(**kwargs)
 
+            self.add_task(self.ping_loop())
+
     async def on_ws_disconnect(self):
         'websocket disconnected'
         self.socket = None
-        logger.info('WebSocket connection lost. Re-establishing...')
 
-    async def connect(self):
-        'establish WebSocket connection'
-        # Implement your WebSocket connection logic here
-        pass
 
 class RabbitMQProtocol(Protocol):
     '''
