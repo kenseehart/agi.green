@@ -35,6 +35,45 @@ socket.addEventListener('open', (event) => {
     onWSConnected();
 });
 
+const md = markdownit({
+
+    // Enable HTML in the markdown source
+    html: true,
+    linkify: true, // Autoconvert URL-like text to links
+    typographer: false, // Enable smart quotes and other typographic substitutions
+
+    // Use highlight.js for syntax highlighting
+    highlight: function (str, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+            try {
+                return hljs.highlight(str, {language: lang}).value;
+            } catch (__) {}
+        }
+        return ''; // Use external default escaping
+    }
+});
+
+if (window.markdownitFootnote) {
+    md.use(window.markdownitFootnote);
+}
+else {
+    console.log('markdownitFootnote not found');
+}
+
+function escapeHtml(text) {
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+        '\n': '<br>',
+    };
+
+    return text.replace(/[&<>"'\n]/g, function(m) { return map[m]; });
+}
+
+
 function send_ws(cmd, data={}) {
     // Send a message to the server
     msg = {cmd, ...data}

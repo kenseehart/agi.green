@@ -132,9 +132,10 @@ class Protocol:
         self.parent: 'Protocol' = None
         self.children: List['Protocol'] = []
         self.exception = Exception
-        self.running = False
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
+        self.running_tasks = []
+        self._closed = False
 
     def __repr__(self):
         r =  self.__class__.__name__
@@ -203,18 +204,38 @@ class Protocol:
             self.add_protocol(p)
 
     def get_protocol(self, protocol_id: str) -> "Protocol":
-        return self._root.registered_protocols[protocol_id]
+        try:
+            return self.registered_protocols[protocol_id]
+        except KeyError as e:
+            raise ValueError(f'protocol {protocol_id} not found in {self}') from e
 
     def catch_exception(self, exception: Exception):
         self.exception = exception
 
-    async def arun(self):
-        self.running = True
+    def add_task(self, coro):
+        """Starts a task and adds it to running_tasks."""
+        if self._closed:
+            raise Exception("Protocol is closed. Cannot add new tasks.")
+        task = asyncio.create_task(coro)
+        self.running_tasks.append(task)
+        task.add_done_callback(self.running_tasks.remove)
 
-    async def aclose(self):
-        self.running = False
+    async def run(self):
+        pass
+
+    async def close(self):
+        self._closed = True
 
         logger.info(f'closing: {self}')
+
+        for task in self.running_tasks:
+            task.cancel()
+
+        await asyncio.gather(*self.running_tasks, return_exceptions=True)
+
+        self.running_tasks.clear()
+
+        await asyncio.gather(*[p.close() for p in self.children])
 
         if self.parent:
             self.parent.children.remove(self)
@@ -297,44 +318,37 @@ class Dispatcher(Protocol):
         'True if this protocol is a server'
         return False
 
-    def __init__(self):
+    def __init__(self, session_id:str=None):
         super().__init__()
+        self.session_id = session_id
         self.stop_event = asyncio.Event()
 
-    async def arun(self):
-        'run the dispatcher in additive async mode (concurrent dispatchers use arun()).'
+    async def run(self):
+        'run the dispatcher in additive async mode (concurrent dispatchers use run()).'
         global _protocol_garbage_tracker
         self.running = True
 
-        asyncio.create_task(super().arun())
+        self.add_task(super().run())
 
         # Start all registered async run methods concurrently
         for p in self.children:
-            asyncio.create_task(p.arun())
+            logger.info(f'mq task launched for {self}:{id(self)}->{p}')
+            self.add_task(p.run())
 
         if _protocol_garbage_tracker is None:
             _protocol_garbage_tracker = {}
-            asyncio.create_task(self.scan_orphans())
+            self.add_task(self.scan_orphans())
 
         # Wait for the stop signal
         await self.stop_event.wait()
+        logger.info(f'{self}.run() stopped')
 
-    async def aclose(self):
+    async def close(self):
         'close all subtasks concurrently'
-        await super().aclose()
-        close_tasks = [asyncio.create_task(p.aclose()) for p in self.children]
+        await super().close()
+        close_tasks = [asyncio.create_task(p.close()) for p in self.children]
         await asyncio.gather(*close_tasks)
         self.stop()
-
-    def run(self):
-        'run the dispatcher in the main thread forever - only one dispatcher should use run().'
-        try:
-            asyncio.run(self.arun())
-        except Exception as e:
-            logger.error(e)
-            raise
-        finally:
-            asyncio.run(self.aclose())
 
     def stop(self):
         'signal to stop the Dispatcher'

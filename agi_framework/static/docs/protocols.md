@@ -16,7 +16,6 @@ The `protocols.py` file contains several protocol implementations for an async c
 - `aclose(self)`: Stops the HTTP server.
 - `handle_get_root_request(self, request)`: Handles GET requests to the root URL.
 - `handle_md_request(self, request)`: Handles GET requests for Markdown files.
-- `on_ws_request_md_content(self)`: Requests Markdown content from the browser via WebSocket.
 
 ### RabbitMQProtocol
 - `__init__(self, host:str, port:int=5672, **kwargs)`: Initializes the RabbitMQ protocol.

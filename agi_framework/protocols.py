@@ -15,7 +15,10 @@ import asyncio
 import aiofiles
 import logging
 import glob
-import ssl
+import uuid
+from queue import Queue
+from os.path import exists
+import ast
 
 import aio_pika
 from aiohttp import web, WSMsgType
@@ -23,11 +26,6 @@ import openai
 
 from agi_framework.dispatcher import Protocol, format_call
 from agi_framework.config import Config
-
-from queue import Queue
-from os.path import exists
-import ast
-import gc
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
@@ -47,27 +45,9 @@ text_content_types = {
     '.md': 'text/markdown',
 }
 
-class WebSocketProtocol(Protocol):
+class HTTPServerProtocol(Protocol):
     '''
-    Websocket server
-    '''
-    protocol_id: str = 'ws'
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.socket = None
-
-    async def do_send(self, cmd:str, **kwargs):
-        'send ws message to browser via websocket'
-        kwargs['cmd'] = cmd
-        if self.socket is not None:
-            await self.socket.send_str(json.dumps(kwargs))
-
-class HTTPProtocol(Protocol):
-    '''
-    http, https server
-    Use port for http server
-    Use port+1 for websocket port
+    http server (or https if ssl_context is provided)
 
     If ssl_context is provided, use https, and launch a http->https redirect server
     Otherwise, use http
@@ -77,9 +57,8 @@ class HTTPProtocol(Protocol):
 
     protocol_id: str = 'http'
 
-    def __init__(self, root:str, host:str='0.0.0.0', port:int=8000, nocache=False, ssl_context=None, redirect=None, **kwargs):
+    def __init__(self, session_class, host:str='0.0.0.0', port:int=8000, nocache=False, ssl_context=None, redirect=None, **kwargs):
         super().__init__(**kwargs)
-        self.root = root
         self.host = host
         self.port = port
         self.redirect = redirect
@@ -87,7 +66,126 @@ class HTTPProtocol(Protocol):
         self.app:web.Application = None
         self.runner:web.AppRunner = None
         self.site:web.TCPSite = None
-        self.md_content = None
+        self.session_class = session_class
+        self.sessions:Dict[str, Protocol] = {}
+
+    async def http_to_https_redirect(self, request):
+        assert self.ssl_context is not None, "SSL context must be set for HTTPS redirect"
+        https_location = f'https://{request.host}{request.rel_url}'
+        raise web.HTTPMovedPermanently(https_location)
+
+    def get_or_create_session(self, request):
+        session_id = request.cookies.get('SESSION_ID')
+        new_session_id = None
+
+        if not session_id:
+            new_session_id = session_id = str(uuid.uuid4())
+
+        try:
+            session = self.sessions[session_id]
+        except KeyError:
+            session:Protocol = self.session_class(self, session_id=session_id)
+            self.sessions[session_id] = session
+            self.add_task(session.run())
+
+        return session, new_session_id
+
+    async def handle_http_request(self, request:web.Request):
+        session, new_session_id = self.get_or_create_session(request)
+        http:HTTPSessionProtocol = session.get_protocol('http')
+        response:web.StreamResponse = await http.handle_request(request)
+
+        if new_session_id:
+            response.set_cookie('SESSION_ID', new_session_id)
+            logger.info(f'New session: {new_session_id}')
+
+        return response
+
+    async def handle_websocket_request(self, request:web.Request):
+        socket = web.WebSocketResponse()
+        await socket.prepare(request)
+        session, new_session_id = self.get_or_create_session(request)
+        session.ws.socket = socket
+        await session.ws.handle_mesg('connect')
+
+        async for msg in socket:
+            if msg.type == WSMsgType.TEXT:
+                data = json.loads(msg.data)
+                # Handle the message
+                await session.ws.handle_mesg(**data)
+            elif msg.type == WSMsgType.ERROR:
+                logger.error('ws connection closed with exception %s' % socket.exception())
+            else:
+                logger.info('ws {msg.type}')
+
+        if new_session_id:
+            logger.error(f'Unexpected new session on ws message: {self} {new_session_id}')
+
+        return socket
+
+
+    async def run(self):
+        self.add_task(super().run())
+
+        self.app = web.Application()
+        #handle_websocket_request
+        self.app.router.add_get('/ws', self.handle_websocket_request)  # Delegate WebSocket connections
+        self.app.router.add_get('/{filename:.*}', self.handle_http_request)
+        self.app.router.add_get('/', self.handle_http_request, name='index')
+
+        # Check if SSL context is provided for HTTPS
+        if self.ssl_context:
+            # HTTPS server setup
+            self.runner = web.AppRunner(self.app)
+            await self.runner.setup()
+            self.site = web.TCPSite(self.runner, self.host, self.port, ssl_context=self.ssl_context)
+            logger.info(f'Serving https://{self.host}:{self.port}')
+            await self.site.start()
+
+            if self.redirect:
+                # Additional HTTP server for redirecting to HTTPS
+                redirect_app = web.Application()
+                redirect_app.router.add_get('/{tail:.*}', self.http_to_https_redirect)
+                redirect_runner = web.AppRunner(redirect_app)
+                await redirect_runner.setup()
+                redirect_site = web.TCPSite(redirect_runner, self.host, self.redirect)
+                logger.info(f'Starting HTTP redirect server on http://{self.host}:{self.redirect}')
+                await redirect_site.start()
+        else:
+            # HTTP server setup
+            self.runner = web.AppRunner(self.app)
+            await self.runner.setup()
+            self.site = web.TCPSite(self.runner, self.host, self.port)
+            logger.info(f'Serving http://{self.host}:{self.port}')
+            await self.site.start()
+
+    async def close(self):
+        # Stop the aiohttp site
+        if self.site:
+            await self.site.stop()
+
+        # Shutdown and cleanup the aiohttp app
+        if self.app:
+            await self.app.shutdown()
+            await self.app.cleanup()
+
+        # Finally, cleanup the AppRunner
+        if self.runner:
+            await self.runner.cleanup()
+
+        await super().close()
+
+
+class HTTPSessionProtocol(Protocol):
+    '''
+    Session http protocol handler
+    This is instantiated for each user who connects to the server
+    '''
+
+    protocol_id: str = 'http'
+
+    def __init__(self, nocache=False, **kwargs):
+        super().__init__(**kwargs)
         self.substitutions = {}
         self.static = [join(here, 'static')]
         self.static_handlers:List[Callable] = []
@@ -95,29 +193,6 @@ class HTTPProtocol(Protocol):
         if nocache:
             # force browser to reload static content
             self.substitutions['__TIMESTAMP__'] = str(time.time())
-
-    async def handle_websocket_request(self, request):
-        ws = web.WebSocketResponse()
-        await ws.prepare(request)
-        ws_protocol = self.get_protocol('ws')
-        node:Protocol = await ws_protocol.handle_mesg('connect')
-        node.ws.socket = ws
-        await node.ws.handle_mesg('connect')
-
-        async for msg in ws:
-            if msg.type == WSMsgType.TEXT:
-                data = json.loads(msg.data)
-                # Handle the message
-                await node.ws.handle_mesg(**data)
-            elif msg.type == WSMsgType.ERROR:
-                logger.error('ws connection closed with exception %s' % ws.exception())
-
-        return ws
-
-    async def http_to_https_redirect(self, request):
-        assert self.ssl_context is not None, "SSL context must be set for HTTPS redirect"
-        https_location = f'https://{request.host}{request.rel_url}'
-        raise web.HTTPMovedPermanently(https_location)
 
     def add_static(self, path:str):
         'add static directory'
@@ -134,6 +209,7 @@ class HTTPProtocol(Protocol):
             file_path = os.path.join(static_dir, filename)
             if os.path.isfile(file_path):
                 return file_path
+
         return None
 
     def find_static_glob(self, filename:str):
@@ -172,7 +248,7 @@ class HTTPProtocol(Protocol):
             return None
         return index_file
 
-    async def handle_static(self, request:web.Request):
+    async def handle_request(self, request:web.Request):
         filename = request.match_info['filename'] or 'index.html'
         query = request.query.copy()
 
@@ -210,16 +286,19 @@ class HTTPProtocol(Protocol):
             if not os.path.exists(file_path) or not os.path.isfile(file_path):
                 raise web.HTTPNotFound()
 
-            with open(join(here,'md_template.html'), 'r') as template_file:
-                template = template_file.read()
+            with open(file_path, 'r') as f:
+                content = f.read()
 
-            for key, value in self.substitutions.items():
-                template = template.replace(key, value)
+            # queue up the message (will be queued until after the websocket is connected)
 
-            template = template.replace('__MD_FILE__', filename)
-            template = template.replace('__MD_VIEW__', format)
+            # problem here is that this is the server instance, not a node instance.
+            # need to get the node instance for the user who requested the file
+            # actually, that node instance should be handing this request, not the server instance
 
-            return web.Response(text=template, content_type='text/html')
+            await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
+
+            file_path = self.find_static('index.html')
+            return web.FileResponse(file_path)
 
         # If substitutions are required for textual files
         elif content_type is not None:
@@ -234,65 +313,50 @@ class HTTPProtocol(Protocol):
                 return response
         return web.FileResponse(file_path)
 
-    async def arun(self):
-        asyncio.create_task(super().arun())
 
-        self.app = web.Application()
-        #handle_websocket_request
-        self.app.router.add_get('/ws', self.handle_websocket_request)  # Delegate WebSocket connections
-        self.app.router.add_get('/{filename:.*}', self.handle_static)
-        self.app.router.add_get('/', self.handle_static, name='index')
+class WebSocketProtocol(Protocol):
+    '''
+    Websocket session
+    '''
+    protocol_id: str = 'ws'
 
-        # Check if SSL context is provided for HTTPS
-        if self.ssl_context:
-            # HTTPS server setup
-            self.runner = web.AppRunner(self.app)
-            await self.runner.setup()
-            self.site = web.TCPSite(self.runner, self.host, self.port, ssl_context=self.ssl_context)
-            logger.info(f'Serving https://{self.host}:{self.port}')
-            await self.site.start()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.socket = None
+        self.pre_connect_queue = []
 
-            if self.redirect:
-                # Additional HTTP server for redirecting to HTTPS
-                redirect_app = web.Application()
-                redirect_app.router.add_get('/{tail:.*}', self.http_to_https_redirect)
-                redirect_runner = web.AppRunner(redirect_app)
-                await redirect_runner.setup()
-                redirect_site = web.TCPSite(redirect_runner, self.host, self.redirect)
-                logger.info(f'Starting HTTP redirect server on http://{self.host}:{self.redirect}')
-                await redirect_site.start()
+    async def do_send(self, cmd:str, **kwargs):
+        'send ws message to browser via websocket'
+        kwargs['cmd'] = cmd
+        if self.socket is not None:
+            try:
+                await self.socket.send_str(json.dumps(kwargs))
+            except Exception as e:
+                logger.error(f'ws send error: {e} (queueing message)')
+                self.socket = None
+                self.pre_connect_queue.append(kwargs)
         else:
-            # HTTP server setup
-            self.runner = web.AppRunner(self.app)
-            await self.runner.setup()
-            self.site = web.TCPSite(self.runner, self.host, self.port)
-            logger.info(f'Serving http://{self.host}:{self.port}')
-            await self.site.start()
+            logger.info(f'queuing ws: {cmd} {kwargs}')
+            self.pre_connect_queue.append(kwargs)
 
-    async def aclose(self):
-        # Stop the aiohttp site
-        if self.site:
-            await self.site.stop()
+    async def on_ws_connect(self):
+        'websocket connected'
+        if not self.is_server:
+            assert self.socket is not None, "socket must be set"
 
-        # Shutdown and cleanup the aiohttp app
-        if self.app:
-            await self.app.shutdown()
-            await self.app.cleanup()
+            while self.pre_connect_queue:
+                kwargs = self.pre_connect_queue.pop(0)
+                await self.do_send(**kwargs)
 
-        # Finally, cleanup the AppRunner
-        if self.runner:
-            await self.runner.cleanup()
+    async def on_ws_disconnect(self):
+        'websocket disconnected'
+        self.socket = None
+        logger.info('WebSocket connection lost. Re-establishing...')
 
-        await super().aclose()
-
-
-    async def on_ws_request_md_content(self):
-        'request markdown content from browser via websocket'
-        http = self.get_protocol('http')
-
-        if http.md_content is not None:
-            await self.send('ws', 'update_md_content', content=http.md_content, format=http.md_format)
-
+    async def connect(self):
+        'establish WebSocket connection'
+        # Implement your WebSocket connection logic here
+        pass
 
 class RabbitMQProtocol(Protocol):
     '''
@@ -313,8 +377,8 @@ class RabbitMQProtocol(Protocol):
         self.offline_subscription_queue: Queue = Queue() # queue for subscriptions pending connection
         self.connected = False
 
-    async def arun(self):
-        asyncio.create_task(super().arun())
+    async def run(self):
+        await super().run()
 
         try:
             logger.info(f'Connecting to RabbitMQ on {self.host}:{self.port}')
@@ -341,7 +405,7 @@ class RabbitMQProtocol(Protocol):
             await self.do_send(cmd, ch, **kwargs)
 
 
-    async def aclose(self):
+    async def close(self):
         # Close the RabbitMQ channel and connection
         await self.unsubscribe_all()
 
@@ -351,7 +415,7 @@ class RabbitMQProtocol(Protocol):
 
         # terminate
 
-        await super().aclose()
+        await super().close()
 
     async def listen_to_queue(self, channel_id, queue):
         async with queue.iterator() as queue_iter:
@@ -378,7 +442,7 @@ class RabbitMQProtocol(Protocol):
             self.queues[channel_id] = queue
             logger.info(f'{self._root.username} subscribed to {channel_id}')
 
-            asyncio.create_task(self.listen_to_queue(channel_id, queue))
+            self.add_task(self.listen_to_queue(channel_id, queue))
 
     async def unsubscribe(self, channel_id: str):
         await self.send('mq', 'unsubscribe', channel=channel_id, sender_id=id(self))
@@ -431,8 +495,8 @@ class GPTChatProtocol(Protocol):
         self.name = 'agi.green'
         self.uid = 'bot'
 
-    async def arun(self):
-        asyncio.create_task(super().arun())
+    async def run(self):
+        self.add_task(super().run())
 
         # Ensure the OpenAI client is authenticated
         api_key = os.environ.get("OPENAI_API_KEY", None)
@@ -518,8 +582,8 @@ class CommandProtocol(Protocol):
         super().__init__(**kwargs)
         self.config = config
 
-    async def arun(self):
-        asyncio.create_task(super().arun())
+    async def run(self):
+        self.add_task(super().run())
 
     async def on_ws_chat_input(self, content:str):
         'receive command syntax on the mq chat channel'

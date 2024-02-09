@@ -7,7 +7,7 @@ import logging
 import asyncio
 
 from agi_framework.dispatcher import Dispatcher
-from agi_framework.protocols import WebSocketProtocol, HTTPProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
+from agi_framework.protocols import WebSocketProtocol, HTTPServerProtocol, HTTPSessionProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
 from agi_framework.config import Config
 
 # RabbitMQ port 5672
@@ -30,8 +30,8 @@ def create_ssl_context(cert_file:str, key_file:str):
     return ssl_context
 
 class ChatServer(Dispatcher):
-    '''Main server for chat (spawns ChatNode for each user on ws connect)
-    To customize, you can start by replacing ChatNode with your own node class.
+    '''Main server for chat (spawns ChatSession for each user on ws connect)
+    To customize, you can start by replacing ChatSession with your own session class.
     '''
 
     @property
@@ -39,9 +39,9 @@ class ChatServer(Dispatcher):
         'True if this protocol is a server (default: False)'
         return True
 
-    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, node_class=None, ssl_context=None, redirect=None):
+    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, session_class=None, ssl_context=None, redirect=None):
         super().__init__()
-        self.node_class = node_class or ChatNode
+        self.session_class = session_class or ChatSession
         self.root = root
         self.server = self
         self.port = port
@@ -50,34 +50,15 @@ class ChatServer(Dispatcher):
             join(here, 'agi_config_default.yaml'),
         )
 
-        self.http = HTTPProtocol(root=root, host=host, port=port, nocache=True, ssl_context=ssl_context, redirect=redirect)
-        self.ws = WebSocketProtocol()
+        self.http = HTTPServerProtocol(self.session_class, host=host, port=port, nocache=True, ssl_context=ssl_context, redirect=redirect)
 
         self.add_protocols(
             self.http,
-            self.ws,
         )
 
         self.nodes = {}
 
-    async def on_ws_connect(self):
-        'handle new websocket connection'
-        # create a new ChatNode for this user
-        node = self.node_class(self, root=self.root, port=self.port, rabbitmq_host=self.config['rabbitmq']['host'])
-        self.add_node(node)
-        asyncio.create_task(node.arun())
-        return node
-
-    def add_node(self, node):
-        logger.info(f'{self} adding node {node} - {node.username}')
-        self.nodes[node.username] = node
-
-    def remove_node(self, node:'ChatNode'):
-        logger.info(f'{self} removing node {node} - {node.username}')
-        node.server = None
-        del self.nodes[node.username]
-
-class ChatNode(Dispatcher):
+class ChatSession(Dispatcher):
     '''
     Manages the connection to RabbitMQ and WebSocket connection to browser.
     handler methods are named on_<protocol>_<cmd> where protocol is mq or ws
@@ -89,46 +70,49 @@ class ChatNode(Dispatcher):
     To customize, we recommend you start by copying and replacing this class with your own.
     '''
 
-    def __init__(self, server:ChatServer, root:str='.', port:int=8000, rabbitmq_host:str='localhost'):
-        super().__init__()
+    def __init__(self, server:ChatServer, session_id, **kwargs):
+        super().__init__(**kwargs)
         self.server = server
         self.username = f'guest_{get_uid(8)}'
-        self.root = root
-        self.port = port
+        self.session_id = session_id
         self.config = Config(
             join(here, 'agi_config.yaml'),
             join(here, 'agi_config_default.yaml'),
         )
 
+        rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
+
+        self.http = HTTPSessionProtocol()
         self.ws = WebSocketProtocol()
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
         self.cmd = CommandProtocol(self.config)
 
         self.add_protocols(
+            self.http,
             self.ws,
             self.mq,
             self.cmd,
         )
-        logger.info(f'ChatNode {self.username} created')
+        logger.info(f'{type(self).__name__} {self.username} created: rabbitmq={rabbitmq_host}')
 
     def __repr__(self):
         return f'{super().__repr__()} {self.username}'
 
     def __del__(self):
-        logger.info(f'ChatNode {self.username} deleted')
+        logger.info(f'{self} deleted')
 
     async def on_ws_connect(self):
         'post connection node setup'
-        logger.info(f'ChatNode {self.username} connected')
+        logger.info(f'{self} connected')
         await self.mq.subscribe('broadcast')
         await self.mq.subscribe('chat.public')
         self.active_channel = 'chat.public'
 
     async def on_ws_disconnect(self):
         'post connection node cleanup'
-        logger.info(f'ChatNode {self.username} disconnected')
+        logger.info(f'{self} disconnected')
         self.server.remove_node(self)
-        asyncio.create_task(self.aclose())
+        self.add_task(self.close())
 
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
@@ -143,12 +127,12 @@ class ChatNode(Dispatcher):
     async def on_cmd_user_info(self, **kwargs):
         'receive user info'
 
-class ChatGPTNode(ChatNode):
+class ChatGPTSession(ChatSession):
     '''ChatNode with GPT-4 joining in.
 
     '''
-    def __init__(self, server:ChatServer, root:str='.', port:int=8000, rabbitmq_host:str='localhost'):
-        super().__init__(server, root, port, rabbitmq_host)
+    def __init__(self, server:ChatServer, port:int=8000, rabbitmq_host:str='localhost'):
+        super().__init__(server, port, rabbitmq_host)
         self.gpt = GPTChatProtocol(self.config)
         self.add_protocol(self.gpt)
 
@@ -180,7 +164,7 @@ def main():
         ptvsd.wait_for_attach()
         logger.info(".. debugger attached")
 
-    node_class=ChatGPTNode if args.gpt else ChatNode
+    node_class=ChatGPTSession if args.gpt else ChatSession
 
     if args.http:
         ssl_context = None
