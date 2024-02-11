@@ -35,6 +35,10 @@ socket.addEventListener('open', (event) => {
     onWSConnected();
 });
 
+function onWSConnected() {
+    console.log('onWSConnected()');
+}
+
 const md = markdownit({
 
     // Enable HTML in the markdown source
@@ -117,7 +121,7 @@ function on_ws_append_chat(msg) {
         console.log('Using default');
         user = {
             name: uid,
-            icon: 'images/default_avatar.png'
+            icon: '/images/default_avatar.png'
         };
     }
 
@@ -318,10 +322,6 @@ function showRendered() {
 
     sourceButton.classList.add('button-unselected');
     sourceButton.classList.remove('button-selected');
-}
-
-function onWSConnected() {
-    console.log('onWSConnected()');
 }
 
 const vsplitter = document.getElementById('vsplitter');

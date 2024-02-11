@@ -82,7 +82,7 @@ class ChatSession(Dispatcher):
 
         rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
 
-        self.http = HTTPSessionProtocol()
+        self.http = HTTPSessionProtocol(nocache=True)
         self.ws = WebSocketProtocol()
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
         self.cmd = CommandProtocol(self.config)

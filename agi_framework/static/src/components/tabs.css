@@ -1,0 +1,44 @@
+.tab-container {
+    font-family: Arial, sans-serif;
+}
+
+.tab-titles {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid #ccc;
+    background-color: #f1f1f1;
+}
+
+.tab-titles li {
+    float: left;
+    border-right: 1px solid #ccc;
+}
+
+.tab-titles li:last-child {
+    border-right: none;
+}
+
+.tab-titles li a {
+    display: block;
+    color: black;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.tab-titles li a:hover {
+    background-color: #ddd;
+}
+
+.tab-titles .active {
+    background-color: #ccc;
+}
+
+.tab-content {
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-top: none;
+}

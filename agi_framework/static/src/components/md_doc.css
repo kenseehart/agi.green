@@ -1,0 +1,35 @@
+
+.md-doc {
+    position: relative;
+}
+
+.md-button-container {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.md-button-container button {
+    background-color: transparent;
+    border: none; /* This will remove the border around the button */
+    cursor: pointer;
+    padding: 0;
+    outline: none;
+}
+
+.md-button-container img {
+    width: 20px; /* This sets the image width */
+    height: auto; /* This maintains the image aspect ratio */
+    filter: grayscale(100%);
+    opacity: 0.6;
+    transition: filter 0.3s, opacity 0.3s;
+}
+
+.md-source {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 10px;
+}
+
+.md-template-body {
+    padding: 20px;
+}

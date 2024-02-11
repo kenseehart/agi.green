@@ -251,6 +251,11 @@ class HTTPSessionProtocol(Protocol):
 
     async def handle_request(self, request:web.Request):
         filename = request.match_info['filename'] or 'index.html'
+
+        if filename == 'index.html':
+            # since we are serving index.html, we need to reset the socket in case this is a refresh
+            self._root.get_protocol('ws').socket = None
+
         query = request.query.copy()
 
         if filename == 'docs':
@@ -290,30 +295,35 @@ class HTTPSessionProtocol(Protocol):
             with open(file_path, 'r') as f:
                 content = f.read()
 
+            # serve the index.html file. The open_md message will populate the md viewer
+            file_path = self.find_static('index.html')
+
+            # since we are serving index.html, we need to reset the socket
+            self._root.get_protocol('ws').socket = None
+
             # queue up the message (will be queued until after the websocket is connected)
-
-            # problem here is that this is the server instance, not a node instance.
-            # need to get the node instance for the user who requested the file
-            # actually, that node instance should be handing this request, not the server instance
-
             await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
 
-            file_path = self.find_static('index.html')
-            return web.FileResponse(file_path)
+            response = await self.file_with_substitutions(file_path, 'text/html', self.substitutions)
+            return response
 
-        # If substitutions are required for textual files
         elif content_type is not None:
+            response = await self.file_with_substitutions(file_path, content_type, self.substitutions)
+            return response
+
+
+    async def file_with_substitutions(self, file_path:str, content_type:str, substitutions:Dict[str,str]) -> web.Response:
+        if substitutions:
             async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
                 text = await f.read()
 
-            if self.substitutions:
-                for key, value in self.substitutions.items():
-                    text = text.replace(key, value)
+            for key, value in substitutions.items():
+                text = text.replace(key, value)
 
-                response = web.Response(text=text, content_type=content_type)
-                return response
-        return web.FileResponse(file_path)
-
+            response = web.Response(text=text, content_type=content_type)
+            return response
+        else:
+            return web.FileResponse(file_path, content_type=content_type)
 
 WS_PING_INTERVAL = 20
 
@@ -335,8 +345,8 @@ class WebSocketProtocol(Protocol):
         while self.socket is not None:
             try:
                 await self.socket.ping()
-            except ConnectionResetError:
-                logger.error(f'ws ping error: {e}')
+            except ConnectionResetError as e:
+                logger.error(f'ws connection reset (closing)')
                 self.socket = None
                 break
             await asyncio.sleep(WS_PING_INTERVAL)
@@ -353,7 +363,7 @@ class WebSocketProtocol(Protocol):
                 self.socket = None
                 self.pre_connect_queue.append(kwargs)
         else:
-            logger.info(f'queuing ws: {cmd} {kwargs}')
+            logger.info(f'queuing ws: {format_call(cmd, kwargs)}')
             self.pre_connect_queue.append(kwargs)
 
     async def on_ws_connect(self):
@@ -535,8 +545,8 @@ class GPTChatProtocol(Protocol):
         await self.get_completion()
 
     async def on_ws_connect(self):
-        await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='images/bot.png')
-        await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='images/bot.png')
+        await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='/images/bot.png')
+        await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='/images/bot.png')
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
