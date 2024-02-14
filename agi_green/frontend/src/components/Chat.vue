@@ -1,18 +1,21 @@
 <template>
     <div>
-        <div id="messages" class="messages">
-            <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
-                <Avatar
-                    :image="getUserIcon(msg.user)"
-                    :alt="`${getUser(msg.user).name}'s avatar`"
-                    :title="getUser(msg.user).name"
-                    shape="circle"
-                />
-                <div class="chat-message" v-html="msg.content"></div>
-            </div>
+    <div id="messages" class="messages">
+        <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
+        <Avatar
+            :image="getUserIcon(msg.user)"
+            :alt="`${getUser(msg.user).name}'s avatar`"
+            :title="getUser(msg.user).name"
+            shape="circle"
+        />
+        <div class="message-content">
+            <div class="username">{{ getUser(msg.user).name }}</div>
+            <div class="chat-message" v-html="msg.content"></div>
         </div>
-        <textarea id="chat-input-text" v-model="message" @input="autoResize" placeholder="Type your message here..."></textarea>
-        <button @click="onChatInput">Send</button>
+        </div>
+    </div>
+    <textarea id="chat-input-text" v-model="message" @input="autoResize" placeholder="Type your message here..."></textarea>
+    <button @click="onChatInput">Send</button>
     </div>
 </template>
 
@@ -36,10 +39,10 @@
 
     const onChatInput = () => {
         const trimmedMessage = message.value.trim();
-            if (trimmedMessage) {
-                send_ws('chat_input', { content: trimmedMessage });
-                message.value = ''; // Clear the input field after sending
-            }
+        if (trimmedMessage) {
+            send_ws('chat_input', { content: trimmedMessage });
+            message.value = ''; // Clear the input field after sending
+        }
     };
 
     const { proxy } = getCurrentInstance();
@@ -75,5 +78,65 @@
 </script>
 
 <style scoped>
-/* Your styles remain unchanged */
+.messages {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-message-block {
+    display: flex;
+    align-items: flex-start; /* Keeps items aligned at the top */
+    width: 100%; /* Ensures block takes full container width */
+}
+
+.avatar {
+    width: 40px; /* Set a fixed width */
+    height: 40px; /* Set a fixed height */
+    margin-right: 10px; /* Add margin between avatar and message */
+    flex-shrink: 0; /* Prevents shrinking */
+}
+
+.message-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Allows it to grow and fill available space */
+    flex-basis: 0; /* Start with a basis of 0 to grow from there */
+    min-width: 0; /* Prevents overflow of the container */
+}
+
+.username {
+    font-weight: bold;
+    margin-bottom: 5px; /* Space between the username and the message */
+}
+
+.chat-message {
+    background-color: #f4f4f4;
+    padding: 10px;
+    border-radius: 8px;
+    word-break: break-word; /* Ensure long words don't overflow */
+}
+
+textarea {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 10px;
+    resize: vertical;
+    border: 1px solid #ccc; /* Example border styling */
+    border-radius: 4px; /* Example border radius */
+}
+
+button {
+    /* Button styling */
+    background-color: #007bff; /* Example background color */
+    color: white; /* Example text color */
+    padding: 10px 15px; /* Example padding */
+    border: none; /* Example border removal */
+    border-radius: 4px; /* Example border radius */
+    cursor: pointer; /* Change cursor to pointer on hover */
+    margin-top: 10px; /* Space above the button */
+}
+
+button:hover {
+    background-color: #0056b3; /* Darker shade for hover state */
+}
 </style>
