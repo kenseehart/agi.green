@@ -11,7 +11,7 @@ The `protocols.py` file contains several protocol implementations for an async c
 - `do_send(self, cmd:str, **kwargs)`: Sends a WebSocket message to the browser.
 
 ### HTTPProtocol
-- `__init__(self, port:int=8000, nocache=False, **kwargs)`: Initializes the HTTP server.
+- `__init__(self, port:int=8000, **kwargs)`: Initializes the HTTP server.
 - `arun(self)`: Starts the HTTP server.
 - `aclose(self)`: Stops the HTTP server.
 - `handle_get_root_request(self, request)`: Handles GET requests to the root URL.

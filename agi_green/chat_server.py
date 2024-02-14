@@ -6,9 +6,9 @@ import random
 import logging
 import asyncio
 
-from agi_framework.dispatcher import Dispatcher
-from agi_framework.protocols import WebSocketProtocol, HTTPServerProtocol, HTTPSessionProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
-from agi_framework.config import Config
+from agi_green.dispatcher import Dispatcher
+from agi_green.protocols import WebSocketProtocol, HTTPServerProtocol, HTTPSessionProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
+from agi_green.config import Config
 
 # RabbitMQ port 5672
 # VScode debug port 5678
@@ -50,7 +50,7 @@ class ChatServer(Dispatcher):
             join(here, 'agi_config_default.yaml'),
         )
 
-        self.http = HTTPServerProtocol(self.session_class, host=host, port=port, nocache=True, ssl_context=ssl_context, redirect=redirect)
+        self.http = HTTPServerProtocol(self.session_class, host=host, port=port, ssl_context=ssl_context, redirect=redirect)
 
         self.add_protocols(
             self.http,
@@ -82,7 +82,7 @@ class ChatSession(Dispatcher):
 
         rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
 
-        self.http = HTTPSessionProtocol(nocache=True)
+        self.http = HTTPSessionProtocol()
         self.ws = WebSocketProtocol()
         self.mq = RabbitMQProtocol(host=rabbitmq_host)
         self.cmd = CommandProtocol(self.config)

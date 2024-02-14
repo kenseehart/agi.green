@@ -24,8 +24,8 @@ import aio_pika
 from aiohttp import web, WSMsgType
 import openai
 
-from agi_framework.dispatcher import Protocol, format_call
-from agi_framework.config import Config
+from agi_green.dispatcher import Protocol, format_call
+from agi_green.config import Config
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ logging.basicConfig(level=log_level)
 text_content_types = {
     '.html': 'text/html',
     '.js': 'application/javascript',
+    '.map': 'application/json',
     '.css': 'text/css',
     '.txt': 'text/plain',
     '.md': 'text/markdown',
@@ -57,7 +58,7 @@ class HTTPServerProtocol(Protocol):
 
     protocol_id: str = 'http'
 
-    def __init__(self, session_class, host:str='0.0.0.0', port:int=8000, nocache=False, ssl_context=None, redirect=None, **kwargs):
+    def __init__(self, session_class, host:str='0.0.0.0', port:int=8000, ssl_context=None, redirect=None, **kwargs):
         super().__init__(**kwargs)
         self.host = host
         self.port = port
@@ -96,6 +97,9 @@ class HTTPServerProtocol(Protocol):
         response:web.StreamResponse = await http.handle_request(request)
 
         if new_session_id:
+            if response is None:
+                logger.error(f'Request failed on new session {new_session_id} on http request:')
+                logger.error(f'  {request}')
             response.set_cookie('SESSION_ID', new_session_id)
             logger.info(f'New session: {new_session_id}')
 
@@ -185,15 +189,10 @@ class HTTPSessionProtocol(Protocol):
 
     protocol_id: str = 'http'
 
-    def __init__(self, nocache=False, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.substitutions = {}
-        self.static = [join(here, 'static')]
+        self.static = [join(here, 'static'), join(here, 'frontend', 'dist')]
         self.static_handlers:List[Callable] = []
-
-        if nocache:
-            # force browser to reload static content
-            self.substitutions['__TIMESTAMP__'] = str(time.time())
 
     def add_static(self, path:str):
         'add static directory'
@@ -221,7 +220,7 @@ class HTTPSessionProtocol(Protocol):
         return files
 
     def index_md(self):
-        index_file = join(self.static[:2][-1], 'docs', 'index.md')
+        index_file = join(here, 'static', 'docs', 'index.md')
         files = self.find_static_glob('docs/*.md')
         newest_file = max(files, key=os.path.getmtime)
 
@@ -304,26 +303,27 @@ class HTTPSessionProtocol(Protocol):
             # queue up the message (will be queued until after the websocket is connected)
             await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
 
-            response = await self.file_with_substitutions(file_path, 'text/html', self.substitutions)
-            return response
+            return await serve_file(file_path)
 
-        elif content_type is not None:
-            response = await self.file_with_substitutions(file_path, content_type, self.substitutions)
-            return response
-
-
-    async def file_with_substitutions(self, file_path:str, content_type:str, substitutions:Dict[str,str]) -> web.Response:
-        if substitutions:
-            async with aiofiles.open(file_path, mode='r', encoding='utf-8') as f:
-                text = await f.read()
-
-            for key, value in substitutions.items():
-                text = text.replace(key, value)
-
-            response = web.Response(text=text, content_type=content_type)
-            return response
         else:
-            return web.FileResponse(file_path, content_type=content_type)
+            return await serve_file(file_path)
+
+
+
+async def serve_file(file_path):
+    response = web.FileResponse(file_path)
+
+    # Manually set Content-Type for .js.map files
+    if file_path.endswith('.js.map'):
+        response.content_type = 'application/json'
+    # Similarly, ensure .js files are served with the correct Content-Type
+    elif file_path.endswith('.js'):
+        response.content_type = 'application/javascript'
+
+    print(f'{file_path} => {response.content_type}')
+
+    return response
+
 
 WS_PING_INTERVAL = 20
 

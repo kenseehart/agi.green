@@ -20,15 +20,6 @@ catch (e) {
     console.log('Error creating WebSocket:', e);
 }
 
-socket.onerror = function(event) {
-    console.error("WebSocket error observed:", event);
-};
-
-socket.onopen = function(event) {
-    console.log("WebSocket connection established", event);
-};
-
-
 // Connection opened
 socket.addEventListener('open', (event) => {
     console.log('Connected to WS server');
@@ -45,106 +36,6 @@ function send_ws(cmd, data={}) {
     msg = {cmd, ...data}
     console.log('send_ws:', msg);
     socket.send(JSON.stringify(msg));
-}
-
-let userData = {};
-
-function setTextWithNewlines(element, text) {
-    // First clear the current content
-    element.innerHTML = '';
-
-    // Split the text by newlines
-    let lines = text.split('\n');
-
-    // For each line, append a text node and a <br/> element
-    for(let i = 0; i < lines.length; i++) {
-        element.appendChild(document.createTextNode(lines[i]));
-
-        // Add a <br/> for each line except the last one
-        if(i !== lines.length - 1) {
-            element.appendChild(document.createElement('br'));
-        }
-    }
-}
-
-function on_ws_set_user_data(msg) {
-    // Set the user's ID and username
-    userData[msg.uid] = msg;
-    console.log('userData:', userData);
-}
-
-function on_ws_append_chat(msg) {
-    // Get the user's ID and username
-    const uid = msg.author;
-    var user = userData[uid];
-
-    if (!user) {
-        console.log('Unknown user:', uid);
-        console.log('Using default');
-        user = {
-            name: uid,
-            icon: '/images/default_avatar.png'
-        };
-    }
-
-    // Render markdown content
-    const renderedHtml = md.render(msg.content);
-
-    // Append to messages
-    const messages = document.getElementById('messages');
-    const newMessageBlock = document.createElement('div');
-    const newMessage = document.createElement('div');
-    const avatarImage = document.createElement('img');
-    avatarImage.className = 'avatar';
-    avatarImage.src = `${user.icon}`;
-    avatarImage.alt = `${user.name}'s avatar`;
-    avatarImage.title = user.name; // for the mouse-over text
-
-    newMessage.className = 'chat-message';
-    newMessage.innerHTML += renderedHtml;
-    newMessageBlock.className = 'chat-message-block';
-    newMessageBlock.appendChild(avatarImage);
-    newMessageBlock.appendChild(newMessage);
-    messages.appendChild(newMessageBlock);
-
-
-    // Initialize Mermaid for new elements
-    mermaid.init(undefined, newMessage.querySelectorAll('.language-mermaid'));
-
-    // Process MathJax (if necessary)
-    window.MathJax.typesetPromise([newMessage]);
-
-    // Scroll to the bottom of the messages
-    messages.scrollTop = messages.scrollHeight;
-}
-
-
-// Workspace injection
-// Add a web component to the workspace
-
-function on_ws_workspace_component(msg) {
-    // Ensure the game-component script is loaded only once
-    console.log('on_ws_workspace_component:', msg);
-
-    if (!window.workspaceComponentsLoaded) {
-        window.workspaceComponentsLoaded = {};
-    }
-
-    if (!window.workspaceComponentsLoaded[msg.name]) {
-        const script = document.createElement('script');
-        script.src = msg.name+'_component.js?ts='+Date.now();
-        add_ws_promise(msg.name);
-        script.onload = function() {
-            // call {msg.name}_component.js's inject_{msg.name}() function
-            window.workspaceComponentsLoaded[msg.name] = true;
-            window['inject_'+msg.name]();
-            resolve_ws_promise(msg.name);
-        };
-        document.body.appendChild(script);
-    }
-    else {
-        window['inject_'+msg.name]();
-    }
 }
 
 // Listen for messages from server
@@ -226,8 +117,6 @@ function resolve_ws_promise(promise) {
     }
 }
 
-
-
 socket.onerror = function(event) {
     error(`WebSocket Error: ${event.message}`);
     on_ws_append_chat({
@@ -243,6 +132,68 @@ socket.onclose = function(event) {
         error('Connection died');
     }
 };
+
+socket.onopen = function(event) {
+    console.log("WebSocket connection established", event);
+};
+
+
+
+let userData = {};
+
+function setTextWithNewlines(element, text) {
+    // First clear the current content
+    element.innerHTML = '';
+
+    // Split the text by newlines
+    let lines = text.split('\n');
+
+    // For each line, append a text node and a <br/> element
+    for(let i = 0; i < lines.length; i++) {
+        element.appendChild(document.createTextNode(lines[i]));
+
+        // Add a <br/> for each line except the last one
+        if(i !== lines.length - 1) {
+            element.appendChild(document.createElement('br'));
+        }
+    }
+}
+
+function on_ws_set_user_data(msg) {
+    // Set the user's ID and username
+    userData[msg.uid] = msg;
+    console.log('userData:', userData);
+}
+
+
+// Workspace injection
+// Add a web component to the workspace
+
+function on_ws_workspace_component(msg) {
+    // Ensure the game-component script is loaded only once
+    console.log('on_ws_workspace_component:', msg);
+
+    if (!window.workspaceComponentsLoaded) {
+        window.workspaceComponentsLoaded = {};
+    }
+
+    if (!window.workspaceComponentsLoaded[msg.name]) {
+        const script = document.createElement('script');
+        script.src = msg.name+'_component.js?ts='+Date.now();
+        add_ws_promise(msg.name);
+        script.onload = function() {
+            // call {msg.name}_component.js's inject_{msg.name}() function
+            window.workspaceComponentsLoaded[msg.name] = true;
+            window['inject_'+msg.name]();
+            resolve_ws_promise(msg.name);
+        };
+        document.body.appendChild(script);
+    }
+    else {
+        window['inject_'+msg.name]();
+    }
+}
+
 
 function autoResize() {
     this.style.height = 'inherit'; // Briefly shrink textarea to minimal size
@@ -286,67 +237,6 @@ function showRendered() {
     sourceButton.classList.remove('button-selected');
 }
 
-const vsplitter = document.getElementById('vsplitter');
-if (vsplitter) {
-    // Resizer from https://htmldom.dev/create-resizable-split-views/
-    const leftSide = vsplitter.previousElementSibling;
-    const rightSide = vsplitter.nextElementSibling;
-
-    // The current position of mouse
-    let x = 0;
-    let y = 0;
-
-    // Width of left side
-    let leftWidth = 0;
-
-    // Handle the mousedown event
-    // that's triggered when user drags the resizer
-    const resizeMouseDownHandler = function (e) {
-        // Get the current mouse position
-        x = e.clientX;
-        y = e.clientY;
-        leftWidth = leftSide.getBoundingClientRect().width;
-
-        // Attach the listeners to `document`
-        document.addEventListener('mousemove', mouseMoveHandler);
-        document.addEventListener('mouseup', mouseUpHandler);
-    };
-
-    // Attach the handler
-    vsplitter.addEventListener('mousedown', resizeMouseDownHandler);
-
-    const mouseMoveHandler = function (e) {
-        // How far the mouse has been moved
-        const dx = e.clientX - x;
-        const dy = e.clientY - y;
-
-        const newLeftWidth = ((leftWidth + dx) * 100) / vsplitter.parentNode.getBoundingClientRect().width;
-        leftSide.style.width = `${newLeftWidth}%`;
-        vsplitter.style.cursor = 'col-resize';
-        document.body.style.cursor = 'col-resize';
-
-        leftSide.style.userSelect = 'none';
-        leftSide.style.pointerEvents = 'none';
-
-        rightSide.style.userSelect = 'none';
-        rightSide.style.pointerEvents = 'none';
-    };
-
-    const mouseUpHandler = function () {
-        vsplitter.style.removeProperty('cursor');
-        document.body.style.removeProperty('cursor');
-
-        leftSide.style.removeProperty('user-select');
-        leftSide.style.removeProperty('pointer-events');
-
-        rightSide.style.removeProperty('user-select');
-        rightSide.style.removeProperty('pointer-events');
-
-        // Remove the handlers of `mousemove` and `mouseup`
-        document.removeEventListener('mousemove', mouseMoveHandler);
-        document.removeEventListener('mouseup', mouseUpHandler);
-    };
-}
 
 function unpack(packedList) {
     let unpacked = [];
