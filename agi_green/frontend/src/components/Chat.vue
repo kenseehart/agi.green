@@ -1,29 +1,29 @@
 <template>
-    <div>
+  <perfect-scrollbar>
     <div id="messages" class="messages">
         <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
-        <Avatar
-            :image="getUserIcon(msg.user)"
-            :alt="`${getUser(msg.user).name}'s avatar`"
-            :title="getUser(msg.user).name"
-            shape="circle"
-        />
-        <div class="message-content">
-            <div class="username">{{ getUser(msg.user).name }}</div>
-            <div class="chat-message" v-html="msg.content"></div>
-        </div>
+            <Avatar
+                :image="getUserIcon(msg.user)"
+                :alt="`${getUser(msg.user).name}'s avatar`"
+                :title="getUser(msg.user).name"
+                shape="circle"
+            />
+            <div class="message-content">
+                <div class="username">{{ getUser(msg.user).name }}</div>
+                <div class="chat-message" v-html="msg.content"></div>
+            </div>
         </div>
     </div>
     <textarea id="chat-input-text" v-model="message" @input="autoResize" placeholder="Type your message here..."></textarea>
     <button @click="onChatInput">Send</button>
-    </div>
+  </perfect-scrollbar>
 </template>
 
 <script setup>
     import { ref, onMounted, getCurrentInstance, onBeforeUnmount, inject } from 'vue';
     import MarkdownIt from 'markdown-it';
     import { userData } from '@/plugins/userDataPlugin';
-    import emitter, { bind_handlers, unbind_handlers } from '@/emitter';
+    import { bind_handlers, unbind_handlers } from '@/emitter';
     import Avatar from 'primevue/avatar';
 
     const send_ws = inject('send_ws');
@@ -60,7 +60,7 @@
     const handlers = {
         ws_append_chat: (msg) => {
             chatMessages.value.push({
-                id: Date.now(), // Consider a more robust ID strategy
+                t: Date.now(),
                 user: msg.author,
                 content: md.render(msg.content),
             });
@@ -139,4 +139,9 @@ button {
 button:hover {
     background-color: #0056b3; /* Darker shade for hover state */
 }
+
+.ps {
+  height: 100%;
+}
+
 </style>

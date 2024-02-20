@@ -5,6 +5,7 @@ export const emitter = Mitt();
 export function bind_handlers(handlers) {
     Object.entries(handlers).forEach(([eventName, handler]) => {
         if (typeof handler === 'function') {
+            console.log('Binding handler', eventName);
             emitter.on(eventName, handler);
         }
     });

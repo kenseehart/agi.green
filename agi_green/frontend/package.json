@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "highlight.js": "^11.9.0",
     "markdown-it": "^14.0.0",
     "mitt": "^3.0.1",
     "primeicons": "^6.0.1",
     "primevue": "^3.48.1",
     "vue": "^3.4.15",
+    "vue3-perfect-scrollbar": "^1.6.1",
     "websocket": "^1.0.34"
   },
   "devDependencies": {

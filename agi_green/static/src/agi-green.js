@@ -159,11 +159,7 @@ function setTextWithNewlines(element, text) {
     }
 }
 
-function on_ws_set_user_data(msg) {
-    // Set the user's ID and username
-    userData[msg.uid] = msg;
-    console.log('userData:', userData);
-}
+
 
 
 // Workspace injection
