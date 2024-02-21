@@ -61,14 +61,29 @@ onBeforeUnmount(() => {
 
 <style>
 
-.p-tabview-panels, .p-tabview-panel {
-    flex: 1;
-    overflow: hidden; /* Prevents undesired native scrolling */
+.p-tabview {
+    flex: 1; /* This makes the tab content fill available space */
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Ensures it can shrink */
+    max-height: 100%;
 }
 
-.p-tabview {
-    height: 100%;
+.p-tabview-panels {
+    flex: 1; /* This makes the tab content fill available space */
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Ensures it can shrink */
+    max-height: 100%;
 }
+
+.p-tabview-panel {
+    display: flex;
+    flex: 1; /* This makes the tab content fill available space */
+    flex-direction: column;
+    min-height: 0; /* Ensures it can shrink */
+    max-height: 100%;}
+
 
 </style>
 ```

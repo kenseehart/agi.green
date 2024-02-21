@@ -1,16 +1,16 @@
 <template>
-    <div class="md-button-container">
-        <button @click="setViewMode('rendered')"
-            :class="{'md-button-selected': viewMode === 'rendered', 'md-button-unselected': viewMode !== 'rendered'}">
-            <img :src="renderIcon" alt="Markdown Rendered">
-        </button>
-        <button @click="setViewMode('source')"
-            :class="{'md-button-selected': viewMode === 'source', 'md-button-unselected': viewMode !== 'source'}">
-            <img :src="sourceIcon" alt="Markdown Source">
-        </button>
-    </div>
     <div class="flex-container">
-        <ScrollPanel class="flex-grow">
+        <div class="md-button-container">
+            <button @click="setViewMode('rendered')"
+                :class="{'md-button-selected': viewMode === 'rendered', 'md-button-unselected': viewMode !== 'rendered'}">
+                <img :src="renderIcon" alt="Markdown Rendered">
+            </button>
+            <button @click="setViewMode('source')"
+                :class="{'md-button-selected': viewMode === 'source', 'md-button-unselected': viewMode !== 'source'}">
+                <img :src="sourceIcon" alt="Markdown Source">
+            </button>
+        </div>
+        <ScrollPanel class="flexy-scroll">
             <div class="md-doc">
                 <div v-if="viewMode === 'source'">
                     <pre><code>{{ props.markdownContent }}</code></pre>
@@ -49,19 +49,16 @@ const renderedContent = computed(() => md.render(props.markdownContent));
 
 
 
-<style>
+<style scoped>
 /* Add styles for your markdown viewer here */
 
 .md-doc {
     position: relative;
-    flex: 1; /* Takes up all available space */
-    overflow: hidden; /* Add this to prevent native scrollbars */
 }
 
 .md-doc pre {
     margin: 0px;
-    display: flex;
-    flex: 1; /* Takes up all available space */
+    box-sizing: border-box;
 }
 
 .md-source {
@@ -84,7 +81,7 @@ const renderedContent = computed(() => md.render(props.markdownContent));
     align-items: center; /* Center items vertically */
     position: absolute;
     top: -15px;
-    right: -15px;
+    right: 0;
     z-index: 100;
 }
 
@@ -110,15 +107,21 @@ const renderedContent = computed(() => md.render(props.markdownContent));
 }
 
 .flex-container {
+    position: relative;
     display: flex;
     flex-direction: column;
-    height: 100vh; /* Adjust based on your layout needs */
+    flex: 1;
+    min-height: 0; /* Ensures it can shrink */
+    max-height: 100%;
 }
 
-.flex-grow {
+.flexy-scroll {
+    display: flex;
+    flex-direction: column;
     flex: 1;
-    /* Ensuring ScrollPanel takes the available space */
-    width: 100%; /* Full width */
-    overflow-y: auto; /* Just in case */
+    min-height: 0; /* Ensures it can shrink */
+    max-height: 100%;
+    overflow-y: auto;
 }
+
 </style>
