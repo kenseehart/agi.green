@@ -1,30 +1,34 @@
 <template>
-  <perfect-scrollbar>
-    <div id="messages" class="messages">
-        <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
-            <Avatar
-                :image="getUserIcon(msg.user)"
-                :alt="`${getUser(msg.user).name}'s avatar`"
-                :title="getUser(msg.user).name"
-                shape="circle"
-            />
-            <div class="message-content">
+    <div class="flex-container">
+    <ScrollPanel class="flex-grow">
+        <div id="messages" class="messages">
+            <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
+                <Avatar
+                    :image="getUserIcon(msg.user)"
+                    :alt="`${getUser(msg.user).name}'s avatar`"
+                    :title="getUser(msg.user).name"
+                    shape="circle"
+                />
+                <div class="message-content">
                 <div class="username">{{ getUser(msg.user).name }}</div>
                 <div class="chat-message" v-html="msg.content"></div>
+                </div>
             </div>
         </div>
+        <textarea id="chat-input-text" v-model="message" @input="autoResize" placeholder="Type your message here..."></textarea>
+        <button class="send-button" @click="onChatInput">Send</button>
+    </ScrollPanel>
     </div>
-    <textarea id="chat-input-text" v-model="message" @input="autoResize" placeholder="Type your message here..."></textarea>
-    <button @click="onChatInput">Send</button>
-  </perfect-scrollbar>
 </template>
 
+
 <script setup>
-    import { ref, onMounted, getCurrentInstance, onBeforeUnmount, inject } from 'vue';
+    import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, inject } from 'vue';
     import MarkdownIt from 'markdown-it';
     import { userData } from '@/plugins/userDataPlugin';
     import { bind_handlers, unbind_handlers } from '@/emitter';
     import Avatar from 'primevue/avatar';
+    import ScrollPanel from 'primevue/scrollpanel';
 
     const send_ws = inject('send_ws');
 
@@ -49,7 +53,7 @@
 
     // Function to get user data or default values
     const getUser = (userId) => {
-        return userData[userId] || { name: 'Unknown', icon: '/images/default_avatar.png' };
+        return userData[userId] || { name: 'Unknown', icon: '/avatars/default_avatar.png' };
     };
 
     // Helper to get user icon
@@ -67,6 +71,9 @@
         },
     };
 
+    const scrollPanel = ref(null);
+    const scrollContainerHeight = ref('auto');
+
     onMounted(() => {
         bind_handlers(handlers);
     });
@@ -75,6 +82,7 @@
     onBeforeUnmount(() => {
         unbind_handlers(handlers);
     });
+
 </script>
 
 <style scoped>
@@ -125,7 +133,7 @@ textarea {
     border-radius: 4px; /* Example border radius */
 }
 
-button {
+.send-button {
     /* Button styling */
     background-color: #007bff; /* Example background color */
     color: white; /* Example text color */
@@ -135,13 +143,23 @@ button {
     cursor: pointer; /* Change cursor to pointer on hover */
     margin-top: 10px; /* Space above the button */
 }
-
-button:hover {
+.send-button:hover {
     background-color: #0056b3; /* Darker shade for hover state */
 }
 
-.ps {
-  height: 100%;
+.flex-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Adjust based on your layout needs */
 }
 
+.flex-grow {
+    flex: 1;
+    /* Ensuring ScrollPanel takes the available space */
+    width: 100%; /* Full width */
+    overflow-y: auto; /* Just in case */
+}
+
+/* Rest of the CSS stays the same, make sure the container of ScrollPanel is styled to occupy the intended space */
 </style>
+

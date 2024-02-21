@@ -5,7 +5,7 @@
           <Chat />
       </SplitterPanel>
       <SplitterPanel size={70}>
-        <DocTabs style="height: 100vh;"/>
+        <DocTabs class="doc-tabs"/>
       </SplitterPanel>
     </Splitter>
   </div>
@@ -18,4 +18,10 @@ import Chat from './components/Chat.vue'; // Adjust the path as necessary
 
 </script>
 
+<style scoped>
+.doc-tabs {
+  display: flex;
+  flex-direction: column;
+}
+</style>
 

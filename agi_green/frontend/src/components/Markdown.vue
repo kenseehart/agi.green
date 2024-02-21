@@ -9,15 +9,17 @@
             <img :src="sourceIcon" alt="Markdown Source">
         </button>
     </div>
-    <perfect-scrollbar>
-        <div class="md-doc">
-            <div v-if="viewMode === 'source'">
-                <pre><code>{{ props.markdownContent }}</code></pre>
+    <div class="flex-container">
+        <ScrollPanel class="flex-grow">
+            <div class="md-doc">
+                <div v-if="viewMode === 'source'">
+                    <pre><code>{{ props.markdownContent }}</code></pre>
+                </div>
+                <div v-else v-html="renderedContent">
+                </div>
             </div>
-            <div v-else v-html="renderedContent">
-            </div>
-        </div>
-    </perfect-scrollbar>
+        </ScrollPanel>
+    </div>
 </template>
 
 <script setup>
@@ -107,8 +109,16 @@ const renderedContent = computed(() => md.render(props.markdownContent));
     opacity: 1 !important;
 }
 
-.ps {
+.flex-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Adjust based on your layout needs */
+}
 
-    flex: 1; /* Takes up all available space */
+.flex-grow {
+    flex: 1;
+    /* Ensuring ScrollPanel takes the available space */
+    width: 100%; /* Full width */
+    overflow-y: auto; /* Just in case */
 }
 </style>
