@@ -118,7 +118,6 @@
 }
 
 .chat-message {
-    background-color: #f4f4f4;
     padding: 10px;
     border-radius: 8px;
     word-break: break-word; /* Ensure long words don't overflow */
@@ -129,22 +128,15 @@ textarea {
     margin-top: 1rem;
     padding: 10px;
     resize: vertical;
-    border: 1px solid #ccc; /* Example border styling */
     border-radius: 4px; /* Example border radius */
 }
 
 .send-button {
     /* Button styling */
-    background-color: #007bff; /* Example background color */
-    color: white; /* Example text color */
     padding: 10px 15px; /* Example padding */
-    border: none; /* Example border removal */
     border-radius: 4px; /* Example border radius */
     cursor: pointer; /* Change cursor to pointer on hover */
     margin-top: 10px; /* Space above the button */
-}
-.send-button:hover {
-    background-color: #0056b3; /* Darker shade for hover state */
 }
 
 .flex-container {

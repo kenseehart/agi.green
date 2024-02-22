@@ -15,7 +15,6 @@
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import Chat from './components/Chat.vue'; // Adjust the path as necessary
-
 </script>
 
 <style scoped>
