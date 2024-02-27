@@ -1,3 +1,37 @@
+/**
+ * Component: Chat
+ * Description: A chat component that displays chat messages and allows users to send new messages.
+ *
+ * Props:
+ *   - None
+ *
+ * Data:
+ *   - chatMessages: An array of chat messages.
+ *   - message: The current message being typed by the user.
+ *
+ * Methods:
+ *   - autoResize: A method that automatically resizes the textarea based on its content.
+ *   - onChatInput: A method that sends the chat message when the user clicks the send button.
+ *   - getUser: A method that retrieves user data based on the user ID.
+ *   - getUserIcon: A method that retrieves the user's avatar icon based on the user ID.
+ *
+ * Hooks:
+ *   - onMounted: A hook that binds event handlers when the component is mounted.
+ *   - onBeforeUnmount: A hook that unbinds event handlers when the component is about to be unmounted.
+ *
+ * Dependencies:
+ *   - Vue Composition API
+ *   - markdown-it
+ *   - userDataPlugin (injected)
+ *   - primevue/avatar
+ *   - primevue/scrollpanel
+ *
+ * Slots:
+ *   - None
+ *
+ * Example Usage:
+ * <Chat />
+ */
 <template>
     <div class="flex-container">
     <ScrollPanel class="flex-grow">

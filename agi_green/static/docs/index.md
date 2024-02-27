@@ -3,5 +3,5 @@
 | File | Description |
 | ---- | ----------- |
 | [**attributions**](/docs/attributions) | *Attributions - thank you!* |
-| [**models**](/docs/models) | *How models.yaml works* |
 | [**protocols**](/docs/protocols) | *Summary of protocols.py* |
+| [**vue_client**](/docs/vue_client) | *AGI Green Vue client* |

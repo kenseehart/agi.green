@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lljj/vue-json-schema-form": "^1.19.0",
     "highlight.js": "^11.9.0",
     "markdown-it": "^14.0.0",
     "mitt": "^3.0.1",

@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { md } from '@/plugins/markdownPlugin'; // Adjust the import path as needed
 import sourceIcon from '@/assets/md-source.png'; // Import the image
 import renderIcon from '@/assets/md-render.png'; // Import the image
@@ -36,6 +36,7 @@ const props = defineProps({
 });
 
 const viewMode = ref('rendered');
+const markdownContainer = ref(null);
 
 const setViewMode = (mode) => {
     console.log('Setting view mode to', mode);
@@ -44,9 +45,32 @@ const setViewMode = (mode) => {
     console.log('View mode changed from', before, 'to', viewMode.value);
 };
 
-const renderedContent = computed(() => md.render(props.markdownContent));
-</script>
+const renderedContent = computed(() => {
+    // Initially just return the rendered markdown
+    // Transformation to include dynamic components will be handled post-render
+    return md.render(props.markdownContent);
+});
 
+const injectForms = () => {
+    if (!markdownContainer.value || viewMode.value === 'source') return;
+
+    // Example: Find and replace placeholders in the renderedContent here
+    // This is where you'd dynamically mount FormRenderer components
+    // Note: This is a conceptual example; actual implementation may vary based on your setup
+};
+
+// Re-inject forms whenever the markdown content or view mode changes
+watch([renderedContent, viewMode], () => {
+    // Ensure the DOM is updated before attempting to inject forms
+    nextTick(() => {
+        injectForms();
+    });
+});
+
+onMounted(() => {
+    injectForms();
+});
+</script>
 
 
 <style scoped>
