@@ -1,75 +1,60 @@
 <template>
     <div class="flex-container">
         <div class="md-button-container">
-            <button @click="setViewMode('rendered')"
+            <button
+                @click="setViewMode('rendered')"
                 :class="{'md-button-selected': viewMode === 'rendered', 'md-button-unselected': viewMode !== 'rendered'}">
                 <img :src="renderIcon" alt="Markdown Rendered">
             </button>
-            <button @click="setViewMode('source')"
+            <button
+                @click="setViewMode('source')"
                 :class="{'md-button-selected': viewMode === 'source', 'md-button-unselected': viewMode !== 'source'}">
                 <img :src="sourceIcon" alt="Markdown Source">
             </button>
         </div>
         <ScrollPanel class="flexy-scroll">
-            <div class="md-doc">
-                <div v-if="viewMode === 'source'">
-                    <pre><code>{{ props.markdownContent }}</code></pre>
-                </div>
-                <div v-else v-html="renderedContent">
-                </div>
+            <div class="md-doc" v-if="viewMode === 'source'">
+                <pre><code>{{ props.markdownContent }}</code></pre>
             </div>
+            <div class="md-doc" v-else v-html="renderedMarkdown" ref="markdownContainer"></div>
         </ScrollPanel>
     </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue';
-import { md } from '@/plugins/markdownPlugin'; // Adjust the import path as needed
+import { ref, watch, onUpdated, nextTick } from 'vue';
+import { processMarkdown, postRender } from '@/plugins/markdownPlugin';
 import sourceIcon from '@/assets/md-source.png'; // Import the image
 import renderIcon from '@/assets/md-render.png'; // Import the image
 
 const props = defineProps({
-    markdownContent: {
-        type: String,
-        default: 'Loading...'
-    }
+    markdownContent: String,
 });
 
 const viewMode = ref('rendered');
 const markdownContainer = ref(null);
 
+watch(() => props.markdownContent, async (newVal) => {
+    if (viewMode.value === 'rendered') {
+        await nextTick(); // Wait for the DOM to update
+        if (markdownContainer.value) {
+            markdownContainer.value.innerHTML = processMarkdown(newVal);
+            postRender(); // Now safe to call postRender
+        } else {
+            console.error('Markdown container is not available');
+        }
+    }
+}, { immediate: true });
+
+onUpdated(() => {
+    if (viewMode.value === 'rendered') {
+        postRender(); // Re-initialize Mermaid and MathJax after component updates
+    }
+});
+
 const setViewMode = (mode) => {
-    console.log('Setting view mode to', mode);
-    const before = viewMode.value;
     viewMode.value = mode;
-    console.log('View mode changed from', before, 'to', viewMode.value);
 };
-
-const renderedContent = computed(() => {
-    // Initially just return the rendered markdown
-    // Transformation to include dynamic components will be handled post-render
-    return md.render(props.markdownContent);
-});
-
-const injectForms = () => {
-    if (!markdownContainer.value || viewMode.value === 'source') return;
-
-    // Example: Find and replace placeholders in the renderedContent here
-    // This is where you'd dynamically mount FormRenderer components
-    // Note: This is a conceptual example; actual implementation may vary based on your setup
-};
-
-// Re-inject forms whenever the markdown content or view mode changes
-watch([renderedContent, viewMode], () => {
-    // Ensure the DOM is updated before attempting to inject forms
-    nextTick(() => {
-        injectForms();
-    });
-});
-
-onMounted(() => {
-    injectForms();
-});
 </script>
 
 

@@ -1,6 +1,7 @@
-// Import markdownit and any other dependencies
 import MarkdownIt from 'markdown-it';
-import hljs from 'highlight.js'; // Assuming you're using highlight.js for syntax highlighting
+import hljs from 'highlight.js';
+import jsYaml from 'js-yaml';
+import mermaid from 'mermaid';
 
 const md = new MarkdownIt({
     html: true,
@@ -9,48 +10,32 @@ const md = new MarkdownIt({
     highlight: function (str, lang) {
         if (lang && hljs.getLanguage(lang)) {
             try {
-                return hljs.highlight(str, { language: lang }).value;
+                return hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
             } catch (_) {}
         }
-    return ''; // Use external default escaping
+        return ''; // Default escaping
     },
 });
 
-md.use(function (md) {
-    const defaultRender = md.renderer.rules.html_block || function (tokens, idx, options, env, self) {
-        return self.renderToken(tokens, idx, options);
-    };
+// Add any custom rules or logic here, e.g., for forms or Mermaid
 
-    md.renderer.rules.html_block = function (tokens, idx, options, env, self) {
-        const token = tokens[idx];
-        if (token.content.startsWith('<!-- Form')) {
-            const jsonString = token.content.replace('<!-- Form', '').replace('-->', '').trim();
-            try {
-                const formData = JSON.parse(jsonString);
-                // Store this formData in a way that your Vue component can access
-                // For example, by adding it to the environment (env)
-                if (!env.forms) env.forms = [];
-                env.forms.push(formData);
-                return ''; // Don't render the comment directly
-            } catch (e) {
-                console.error('Error parsing form JSON:', e);
-                return '';
-            }
-        }
-        return defaultRender(tokens, idx, options, env, self);
-    };
-});
+// Export a function to process Markdown content
+function processMarkdown(content) {
+    return md.render(content);
+}
 
-const escapeHtml = (text) => {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;',
-        '\n': '<br>',
-    };
-    return text.replace(/[&<>"'\n]/g, (m) => map[m]);
-};
+// Post-render function to initialize Mermaid diagrams and MathJax
+function postRender() {
+    // Initialize Mermaid diagrams
+    if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({startOnLoad: true});
+        mermaid.init();
+    }
 
-export { md, escapeHtml };
+    // Process MathJax
+    if (window.MathJax) {
+        window.MathJax.typesetPromise();
+    }
+}
+
+export { processMarkdown, postRender };
