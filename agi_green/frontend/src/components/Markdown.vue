@@ -13,10 +13,12 @@
             </button>
         </div>
         <ScrollPanel class="flexy-scroll">
-            <div class="md-doc" v-if="viewMode === 'source'">
+            <!-- Source Content -->
+            <div v-show="viewMode === 'source'" class="md-doc">
                 <pre><code>{{ props.markdownContent }}</code></pre>
             </div>
-            <div class="md-doc" v-else v-html="renderedMarkdown" ref="markdownContainer"></div>
+            <!-- Rendered Markdown Content -->
+            <div v-show="viewMode === 'rendered'" class="md-doc" v-html="renderedMarkdown" ref="markdownContainer"></div>
         </ScrollPanel>
     </div>
 </template>
@@ -24,38 +26,32 @@
 <script setup>
 import { ref, watch, onUpdated, nextTick } from 'vue';
 import { processMarkdown, postRender } from '@/plugins/markdownPlugin';
-import sourceIcon from '@/assets/md-source.png'; // Import the image
-import renderIcon from '@/assets/md-render.png'; // Import the image
+import sourceIcon from '@/assets/md-source.png';
+import renderIcon from '@/assets/md-render.png';
 
 const props = defineProps({
     markdownContent: String,
 });
 
 const viewMode = ref('rendered');
-const markdownContainer = ref(null);
+const renderedMarkdown = ref('');
 
-watch(() => props.markdownContent, async (newVal) => {
-    if (viewMode.value === 'rendered') {
-        await nextTick(); // Wait for the DOM to update
-        if (markdownContainer.value) {
-            markdownContainer.value.innerHTML = processMarkdown(newVal);
-            postRender(); // Now safe to call postRender
-        } else {
-            console.error('Markdown container is not available');
+// Process markdown content initially and on content updates
+watch(() => props.markdownContent, (newVal) => {
+    renderedMarkdown.value = processMarkdown(newVal);
+    // Ensure postRender is called after markdown has been processed and DOM updated
+    nextTick(() => {
+        if (viewMode.value === 'rendered') {
+            postRender();
         }
-    }
+    });
 }, { immediate: true });
-
-onUpdated(() => {
-    if (viewMode.value === 'rendered') {
-        postRender(); // Re-initialize Mermaid and MathJax after component updates
-    }
-});
 
 const setViewMode = (mode) => {
     viewMode.value = mode;
 };
 </script>
+
 
 
 <style scoped>
