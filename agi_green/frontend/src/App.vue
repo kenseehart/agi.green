@@ -15,6 +15,8 @@
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import Chat from './components/Chat.vue'; // Adjust the path as necessary
+import mermaid from 'mermaid';
+mermaid.initialize({ startOnLoad: false }); //, logLevel: 'debug'
 </script>
 
 <style scoped>

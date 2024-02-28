@@ -26,16 +26,21 @@ function processMarkdown(content) {
 
 // Post-render function to initialize Mermaid diagrams and MathJax
 function postRender() {
-    // Initialize Mermaid diagrams
     if (typeof mermaid !== 'undefined') {
-        mermaid.initialize({startOnLoad: true});
-        mermaid.init();
+
+        mermaid.init(undefined, document.querySelectorAll('.language-mermaid'));
+    } else {
+        console.warn("Mermaid not loaded.");
     }
 
-    // Process MathJax
+    // Process MathJax if needed
     if (window.MathJax) {
         window.MathJax.typesetPromise();
+    } else {
+        console.warn("MathJax not loaded.");
     }
 }
+
+
 
 export { processMarkdown, postRender };
