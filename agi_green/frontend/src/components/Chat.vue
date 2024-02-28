@@ -57,66 +57,64 @@
 
 
 <script setup>
-    import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, inject } from 'vue';
-    import MarkdownIt from 'markdown-it';
-    import { userData } from '@/plugins/userDataPlugin';
-    import { bind_handlers, unbind_handlers } from '@/emitter';
-    import Avatar from 'primevue/avatar';
-    import ScrollPanel from 'primevue/scrollpanel';
+import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, inject, nextTick } from 'vue';
+import { processMarkdown, postRender } from '@/plugins/markdownPlugin'; // Assuming this is your custom processing
+import { userData } from '@/plugins/userDataPlugin';
+import { bind_handlers, unbind_handlers } from '@/emitter';
+import Avatar from 'primevue/avatar';
+import ScrollPanel from 'primevue/scrollpanel';
 
-    const send_ws = inject('send_ws');
+const send_ws = inject('send_ws');
 
-    const chatMessages = ref([]);
-    const message = ref('');
-    const md = new MarkdownIt();
+const chatMessages = ref([]);
+const message = ref('');
 
-    const autoResize = (event) => {
-        event.target.style.height = 'auto';
-        event.target.style.height = event.target.scrollHeight + 'px';
-    };
+const autoResize = (event) => {
+    event.target.style.height = 'auto';
+    event.target.style.height = event.target.scrollHeight + 'px';
+};
 
-    const onChatInput = () => {
-        const trimmedMessage = message.value.trim();
-        if (trimmedMessage) {
-            send_ws('chat_input', { content: trimmedMessage });
-            message.value = ''; // Clear the input field after sending
-        }
-    };
+const onChatInput = () => {
+    const trimmedMessage = message.value.trim();
+    if (trimmedMessage) {
+        send_ws('chat_input', { content: trimmedMessage });
+        message.value = ''; // Clear the input field after sending
+    }
+};
 
-    const { proxy } = getCurrentInstance();
+const { proxy } = getCurrentInstance();
 
-    // Function to get user data or default values
-    const getUser = (userId) => {
-        return userData[userId] || { name: 'Unknown', icon: '/avatars/default_avatar.png' };
-    };
+// Function to get user data or default values
+const getUser = (userId) => {
+    return userData[userId] || { name: 'Unknown', icon: '/avatars/default_avatar.png' };
+};
 
-    // Helper to get user icon
-    const getUserIcon = (userId) => {
-        return getUser(userId).icon;
-    };
+// Helper to get user icon
+const getUserIcon = (userId) => {
+    return getUser(userId).icon;
+};
 
-    const handlers = {
-        ws_append_chat: (msg) => {
-            chatMessages.value.push({
-                t: Date.now(),
-                user: msg.author,
-                content: md.render(msg.content),
-            });
-        },
-    };
+const handlers = {
+    ws_append_chat: (msg) => {
+        chatMessages.value.push({
+            t: Date.now(),
+            user: msg.author,
+            content: processMarkdown(msg.content) // Use custom markdown processing
+        });
+        nextTick(() => {
+            postRender(); // Call postRender if needed for further DOM manipulations
+        });
+    },
+};
 
-    const scrollPanel = ref(null);
-    const scrollContainerHeight = ref('auto');
+onMounted(() => {
+    bind_handlers(handlers);
+});
 
-    onMounted(() => {
-        bind_handlers(handlers);
-    });
-
-    // Cleanup event listeners to prevent memory leaks
-    onBeforeUnmount(() => {
-        unbind_handlers(handlers);
-    });
-
+// Cleanup event listeners to prevent memory leaks
+onBeforeUnmount(() => {
+    unbind_handlers(handlers);
+});
 </script>
 
 <style scoped>
