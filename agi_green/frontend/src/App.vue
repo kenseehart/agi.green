@@ -3,6 +3,7 @@
     <Splitter style="height: 100vh;">
       <SplitterPanel size={30}>
           <Chat />
+          <MDForm />
       </SplitterPanel>
       <SplitterPanel size={70}>
         <DocTabs class="doc-tabs"/>
@@ -14,8 +15,11 @@
 <script setup>
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
-import Chat from './components/Chat.vue'; // Adjust the path as necessary
+import Chat from '@/components/Chat.vue';
+import { Vueform } from '@vueform/vueform';
+
 import mermaid from 'mermaid';
+import MDForm from './components/MDForm.vue';
 mermaid.initialize({ startOnLoad: false }); //, logLevel: 'debug'
 </script>
 

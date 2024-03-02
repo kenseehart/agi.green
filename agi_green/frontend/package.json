@@ -9,7 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@lljj/vue-json-schema-form": "^1.19.0",
+    "@vueform/builder": "^1.2.0",
+    "@vueform/vueform": "^1.8.0",
     "highlight.js": "^11.9.0",
     "js-yaml": "^4.1.0",
     "markdown-it": "^14.0.0",
@@ -22,7 +23,9 @@
     "websocket": "^1.0.34"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@vitejs/plugin-vue": "^5.0.3",
+    "tailwindcss": "^3.4.1",
     "vite": "^5.1.0"
   }
 }

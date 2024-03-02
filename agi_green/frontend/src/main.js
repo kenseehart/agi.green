@@ -17,14 +17,19 @@ import Chat from './components/Chat.vue';
 import PerfectScrollbar from 'vue3-perfect-scrollbar'
 import 'vue3-perfect-scrollbar/dist/vue3-perfect-scrollbar.css'
 
+import Vueform from '@vueform/vueform'
+import vueformConfig from './../vueform.config'
+
 const app = createApp(App);
 
 app.use(PrimeVue);
 app.use(WebSocketPlugin);
 app.use(UserDataPlugin);
 app.use(PerfectScrollbar)
+app.use(Vueform, vueformConfig)
+
 app.component('DocTabs', DocTabs);
 app.component('MarkdownView', MarkdownView);
 app.component('Chat', Chat);
-
+app.component('Vueform', Vueform.Form);
 app.mount('#app');
