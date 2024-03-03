@@ -25,7 +25,43 @@ Displays and interacts with md documents.
 
 ### Forms example:
 
-<!-- Form { "title": "A list of tasks", "type": "object", "required": [ "title" ], "properties": { "title": { "type": "string", "title": "Task list title" }, "tasks": { "type": "array", "title": "Tasks", "items": { "type": "object", "required": [ "title" ], "properties": { "title": { "type": "string", "title": "Title", "description": "A sample title" }, "details": { "type": "string", "title": "Task details", "description": "Enter the task details" }, "done": { "type": "boolean", "title": "Done?", "default": false }, "satisfied": { "type": "boolean", "title": "satisfied?", "default": false } } } } } } -->
+```form-json
+{
+  "id": "login_json",
+  "schema": {
+    "h2": {
+      "type": "static",
+      "tag": "h3",
+      "content": "JSON login form"
+    },
+    "user": {
+      "type": "text",
+      "label": "Username"
+    },
+    "password": {
+      "type": "text",
+      "inputType": "password",
+      "label": "Password"
+    }
+  }
+}
+```
+
+```form-yaml
+id: login_yaml
+schema:
+  h2:
+    type: static
+    tag: h3
+    content: YAML login form
+  user:
+    type: text
+    label: Username
+  password:
+    type: text
+    inputType: password
+    label: Password
+```
 
 ### Mermaid example:
 ```mermaid

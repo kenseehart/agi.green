@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def get_uid(digits=12):
     'generate a unique id: random 12 digit hex'
-    return '%012x' % random.randrange(16**digits)
+    return f'%0{digits}x' % random.randrange(16**digits)
 
 def create_ssl_context(cert_file:str, key_file:str):
     'create ssl context for https'

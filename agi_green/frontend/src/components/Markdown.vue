@@ -121,11 +121,7 @@ const setViewMode = (mode) => {
 }
 
 .flexy-scroll {
-    display: flex;
-    flex-direction: column;
     flex: 1;
-    min-height: 0; /* Ensures it can shrink */
-    max-height: 100%;
     overflow-y: auto;
 }
 

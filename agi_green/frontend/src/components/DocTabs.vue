@@ -67,6 +67,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     min-height: 0; /* Ensures it can shrink */
     max-height: 100%;
+    padding-right: 0;
 }
 
 .p-tabview-panels {
@@ -82,8 +83,8 @@ onBeforeUnmount(() => {
     flex: 1; /* This makes the tab content fill available space */
     flex-direction: column;
     min-height: 0; /* Ensures it can shrink */
-    max-height: 100%;}
-
+    max-height: 100%;
+}
 
 </style>
 ```

@@ -49,8 +49,12 @@
                 </div>
             </div>
         </div>
-        <textarea id="chat-input-text" v-model="message" @input="autoResize" placeholder="Type your message here..."></textarea>
-        <button class="send-button" @click="onChatInput">Send</button>
+        <div class="input-container">
+            <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
+            <button class="send-button" @click="onChatInput">
+                <img src="@/assets/send-button.png" alt="Send" />
+            </button>
+        </div>
     </ScrollPanel>
     </div>
 </template>
@@ -71,7 +75,15 @@ const message = ref('');
 
 const autoResize = (event) => {
     event.target.style.height = 'auto';
-    event.target.style.height = event.target.scrollHeight + 'px';
+    event.target.style.height = event.target.scrollHeight + 5 + 'px';
+};
+
+const onEnterPress = (event) => {
+    // Check if only Enter was pressed without Shift
+    if (!event.shiftKey) {
+        event.preventDefault(); // Prevent the default action to avoid inserting a new line
+        onChatInput();
+    }
 };
 
 const onChatInput = () => {
@@ -80,13 +92,18 @@ const onChatInput = () => {
         send_ws('chat_input', { content: trimmedMessage });
         message.value = ''; // Clear the input field after sending
     }
+
+    const textarea = document.getElementById('chat-input-text');
+    if (textarea) {
+        textarea.style.height = '50px';
+    }
 };
 
 const { proxy } = getCurrentInstance();
 
 // Function to get user data or default values
 const getUser = (userId) => {
-    return userData[userId] || { name: 'Unknown', icon: '/avatars/default_avatar.png' };
+    return userData[userId] || { name: userId, icon: '/avatars/default_avatar.png' };
 };
 
 // Helper to get user icon
@@ -121,6 +138,7 @@ onBeforeUnmount(() => {
 .messages {
     display: flex;
     flex-direction: column;
+    padding: 5px;
 }
 
 .chat-message-block {
@@ -144,6 +162,42 @@ onBeforeUnmount(() => {
     min-width: 0; /* Prevents overflow of the container */
 }
 
+.input-container {
+    position: relative;
+    margin: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+textarea {
+    width: calc(100% - 50px); /* Adjust based on the send button's width to avoid overlap */
+    padding: 10px;
+    padding-right: 40px; /* Increase right padding to prevent text from overlapping the send button */
+    resize: vertical;
+    border-radius: 4px;
+    margin: 10px 0;
+    box-sizing: border-box;
+    flex-grow: 1;
+    min-height: 50px;
+}
+
+.send-button {
+    position: absolute;
+    right: 10px;
+    bottom: 20px;
+    height: 30px;
+    width: 30px;
+    padding: 10;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+.send-button img {
+    height: 100%;
+    width: 100%;
+}
+
 .username {
     font-weight: bold;
     margin-bottom: 5px; /* Space between the username and the message */
@@ -153,22 +207,6 @@ onBeforeUnmount(() => {
     padding: 10px;
     border-radius: 8px;
     word-break: break-word; /* Ensure long words don't overflow */
-}
-
-textarea {
-    width: 100%;
-    margin-top: 1rem;
-    padding: 10px;
-    resize: vertical;
-    border-radius: 4px; /* Example border radius */
-}
-
-.send-button {
-    /* Button styling */
-    padding: 10px 15px; /* Example padding */
-    border-radius: 4px; /* Example border radius */
-    cursor: pointer; /* Change cursor to pointer on hover */
-    margin-top: 10px; /* Space above the button */
 }
 
 .flex-container {
