@@ -22,7 +22,7 @@ import ast
 
 import aio_pika
 from aiohttp import web, WSMsgType
-import openai
+from openai import OpenAI
 
 from agi_green.dispatcher import Protocol, format_call
 from agi_green.config import Config
@@ -513,40 +513,42 @@ class GPTChatProtocol(Protocol):
     '''
     protocol_id: str = 'gpt'
 
+    _openai_client: OpenAI = None
+
     def __init__(self, config:Config, **kwargs):
         super().__init__(**kwargs)
         self.config = config
         self.name = 'agi.green'
         self.uid = 'bot'
 
+    @property
+    def openai_client(self):
+        if GPTChatProtocol._openai_client is None:
+            api_key = os.environ.get("OPENAI_API_KEY", None)
+
+            if api_key is None:
+                raise Exception("OPENAI_API_KEY environment variable must be set")
+
+            GPTChatProtocol._openai_client = OpenAI(api_key=api_key)
+
+        return GPTChatProtocol._openai_client
+
     async def run(self):
         self.add_task(super().run())
-
-        # Ensure the OpenAI client is authenticated
-        api_key = os.environ.get("OPENAI_API_KEY", None)
-
-        if api_key is None:
-            raise Exception("OPENAI_API_KEY environment variable must be set")
 
         self.messages = [
             {"role": "system", "content": "You are a helpful assistant."},
         ]
 
-        if api_key:
-            openai.api_key = api_key
-        else:
-            logger.warn('Missing OpenAI API key in config')
-
     async def on_ws_form_data(self, cmd:str, data:dict):
         key = data.get('key')
-        openai.api_key = key
         self.config.set('openai.key', key)
         self.messages.append({"role": "system", "content": "OpenAI API key was just now set by the user."})
         await self.get_completion()
 
     async def on_ws_connect(self):
-        await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='/images/bot.png')
-        await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='/images/bot.png')
+        await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='/avatars/agibot.png')
+        await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='/avatars/infobot.png')
 
     async def on_mq_chat(self, author:str, content:str):
         'receive chat message from RabbitMQ'
@@ -555,17 +557,16 @@ class GPTChatProtocol(Protocol):
             task = asyncio.create_task(self.get_completion())
 
     async def get_completion(self):
-        loop = asyncio.get_event_loop()
-        content = await loop.run_in_executor(None, self.sync_completion)
-        await self.send('mq', 'chat', channel='chat.public', author=self.uid, content=content)
+        logger.info('skipping GPT4 completion')
+        #loop = asyncio.get_event_loop()
+        #content = await loop.run_in_executor(None, self.sync_completion)
+        #await self.send('mq', 'chat', channel='chat.public', author=self.uid, content=content)
 
     def sync_completion(self):
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=self.messages,
-                )
-            return response.choices[0]['message']['content']
+            response = self.openai_client.chat.completions.create(model="gpt-4",
+            messages=self.messages)
+            return response.choices[0].message.content
         except Exception as e:
             msg = f'OpenAI API error: {e}'
             logger.error(msg)
