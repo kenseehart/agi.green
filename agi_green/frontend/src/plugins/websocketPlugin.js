@@ -42,3 +42,4 @@ export default {
         socket.onclose = () => emitter.emit('ws_close');
     }
 };
+

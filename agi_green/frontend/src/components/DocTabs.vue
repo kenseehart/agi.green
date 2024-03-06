@@ -13,10 +13,16 @@ import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import { bind_handlers, unbind_handlers } from '@/emitter';
 import MarkdownView from '@/components/Markdown.vue'; // Example for direct component import
+import GameIOView from '@/components/GameIO.vue'; // Example for direct component import
 
 const componentMap = {
-    'MarkdownView': MarkdownView, // Assuming MarkdownView is globally registered or imported
+    'MarkdownView': MarkdownView,
+    'GameIOView': GameIOView,
 };
+
+function registerComponent(name, component) {
+    componentMap[name] = component;
+}
 
 // Reactive state to track tabs and the active tab index
 const tabs = ref([]); // Initialize tabs as an empty array
@@ -47,6 +53,9 @@ const handlers = {
             markdownContent: content || 'Loading...',
             viewMode: viewMode || 'rendered',
         });
+    },
+    ws_open_game: (gameData) => {
+        openTab(gameData.uid, 'GameIOView', gameData);
     },
 };
 
