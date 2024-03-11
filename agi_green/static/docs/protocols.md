@@ -29,7 +29,7 @@ The `protocols.py` file contains several protocol implementations for an async c
 - `arun(self)`: Authenticates the OpenAI client.
 - `request_key(self)`: Requests the OpenAI API key from the browser.
 - `on_ws_form_data(self, cmd:str, data:dict)`: Handles form data from the browser via WebSocket.
-- `on_mq_chat(self, author:str, content:str)`: Receives chat messages from RabbitMQ.
+- `on_mq_chat(self, channel_id:str, author:str, content:str)`: Receives chat messages from RabbitMQ.
 - `get_completion(self)`: Gets a chat completion from OpenAI.
 - `sync_completion(self)`: Synchronously gets a chat completion from OpenAI.
 

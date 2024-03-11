@@ -55,7 +55,7 @@ const handlers = {
         });
     },
     ws_open_game: (gameData) => {
-        openTab(gameData.uid, 'GameIOView', gameData);
+        openTab(gameData.game_id, 'GameIOView', gameData);
     },
 };
 

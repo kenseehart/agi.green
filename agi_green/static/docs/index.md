@@ -5,3 +5,15 @@
 | [**attributions**](/docs/attributions) | *Attributions - thank you!* |
 | [**protocols**](/docs/protocols) | *Summary of protocols.py* |
 | [**vue_client**](/docs/vue_client) | *AGI Green Vue client* |
+| [**ann**](/docs/ann) | *Symmetry and Discrete Equivariance - ANN architecture for Game of Y* |
+| [**brain**](/docs/brain) | *Getting Started on brain.agi.green* |
+| [**cim**](/docs/cim) | *Contention Induced Mitosis* |
+| [**combat**](/docs/combat) | *Combat* |
+| [**models**](/docs/models) | *How models.yaml works* |
+| [**othello**](/docs/othello) | *Othello Paper - Ideas* |
+| [**positions**](/docs/positions) | *POVNet Position Protocol* |
+| [**proposal**](/docs/proposal) | *Proposal* |
+| [**pycon**](/docs/pycon) | *[Python US 2024](https://us.pycon.org/2024/) Proposal* |
+| [**symmetry**](/docs/symmetry) | *Minor notes:* |
+| [**training**](/docs/training) | *Training status* |
+| [**training_strategies**](/docs/training_strategies) | *Training Strategies* |

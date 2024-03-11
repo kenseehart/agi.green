@@ -120,7 +120,7 @@ class ChatSession(Dispatcher):
         if not content.startswith('!'):
             await self.send('mq', 'chat', channel=self.active_channel, author=self.username, content=content)
 
-    async def on_mq_chat(self, author:str, content:str):
+    async def on_mq_chat(self, channel_id:str, author:str, content:str):
         'receive chat message from RabbitMQ'
         await self.send('ws', 'append_chat', author=author, content=content)
 

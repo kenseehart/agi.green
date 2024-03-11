@@ -550,7 +550,7 @@ class GPTChatProtocol(Protocol):
         await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='/avatars/agibot.png')
         await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='/avatars/infobot.png')
 
-    async def on_mq_chat(self, author:str, content:str):
+    async def on_mq_chat(self, channel_id:str, author:str, content:str):
         'receive chat message from RabbitMQ'
         if author != self.uid:
             self.messages.append({"role": "user", "content": content})

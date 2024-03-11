@@ -3,10 +3,10 @@
         <div class="game-board" :style="boardStyle">
         <svg ref="svgBoard" :viewBox="'0 0 1 1'" style="width: 100%; height: 100%;" @click="handleClick">
             <defs>
-            <image v-for="piece in pieces" :key="piece.id" :id="`def_${piece.id}_${uid}`" :href="piece.image"
+            <image v-for="piece in pieces" :key="piece.id" :id="`def_${piece.id}_${game_id}`" :href="piece.image"
                 :width="piece.scale" :height="piece.scale" />
             </defs>
-            <use v-for="element in pieceElements" :key="element.uid" :href="`#def_${element.piece}_${uid}`"
+            <use v-for="element in pieceElements" :key="element.uid" :href="`#def_${element.piece}_${game_id}`"
             :x="locations[element.location].coords[0] - pieces[0].scale / 2"
             :y="locations[element.location].coords[1] - pieces[0].scale / 2" />
         </svg>
@@ -24,7 +24,7 @@
     board_image: String,
     locations: Object,
     pieces: Object,
-    uid: String,
+    game_id: String,
   });
 
   const svgBoard = ref(null);
@@ -34,7 +34,7 @@
   const pieceElements = ref([]);
   const allowed = ref([]);
   const nextUid = ref({});
-  const uid = ref(props.uid);
+  const game_id = ref(props.game_id);
 
   function unpack(packedList) {
     let unpacked = [];
@@ -121,6 +121,7 @@ function index_key(key, arr) {
     const move = allowed.value.find(move => move.dest === clickedLocationId);
 
     if (move) {
+      move.game_id = props.game_id;
       doMove(move);
       // Assuming send_ws is a global function to send websocket messages
       send_ws('gameio_move', move);
@@ -174,11 +175,15 @@ function index_key(key, arr) {
 
   const handlers = {
     ws_gameio_allow: (msg) => {
-      allowed.value = unpack(msg.moves);
+        if (msg.game_id === props.game_id) {
+          allowed.value = unpack(msg.moves);
+        }
     },
 
     ws_gameio_move: (msg) => {
-      doMove(msg);
+        if (msg.game_id === props.game_id) {
+          doMove(msg);
+        }
     },
   };
 
