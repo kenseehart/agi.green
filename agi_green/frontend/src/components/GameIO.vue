@@ -3,12 +3,20 @@
         <div class="game-board" :style="boardStyle">
         <svg ref="svgBoard" :viewBox="'0 0 1 1'" style="width: 100%; height: 100%;" @click="handleClick">
             <defs>
+            <image id="clocksOverlay" :href="clocks_image" width="1" height="1" />
             <image v-for="piece in pieces" :key="piece.id" :id="`def_${piece.id}_${game_id}`" :href="piece.image"
                 :width="piece.scale" :height="piece.scale" />
             </defs>
+            <use href="#clocksOverlay" x="0" y="0" />
             <use v-for="element in pieceElements" :key="element.uid" :href="`#def_${element.piece}_${game_id}`"
             :x="locations[element.location].coords[0] - pieces[0].scale / 2"
             :y="locations[element.location].coords[1] - pieces[0].scale / 2" />
+
+            <text x="0.14" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.b }}</text>
+            <text x="0.86" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.w }}</text>
+            <text x="0.14" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockText(clockTimes.b) }}</text>
+            <text x="0.86" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockText(clockTimes.w) }}</text>
+
         </svg>
         </div>
     </div>
@@ -22,19 +30,50 @@
 
   const props = defineProps({
     board_image: String,
+    clocks_image: String,
     locations: Object,
     pieces: Object,
     game_id: String,
+    player_names: Object,
   });
 
   const svgBoard = ref(null);
   const board_image = ref(props.board_image);
+  const clocks_image = ref(props.clocks_image);
   const pieces = ref(props.pieces);
   const locations = ref(props.locations);
   const pieceElements = ref([]);
   const allowed = ref([]);
   const nextUid = ref({});
   const game_id = ref(props.game_id);
+  const player_names = ref(props.player_names);
+  const clockTimes = ref({ b: 0, w: 0 }); // in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is real time t0, 0 means 0:00
+
+
+const clockText = (time) => {
+    // time: in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is t0, 0 means 0:00
+    // t is the actual time remaining
+
+    var t;
+
+    if (time <= 0) {
+        t = -time;
+    } else {
+        t = time - Date.now() / 1000;
+
+        if (t < 0) {
+            t = 0;
+        }
+    }
+
+  if (t >= 60) {
+    const minutes = Math.floor(t / 60);
+    const seconds = Math.floor(t % 60);
+    return `${minutes}M:${seconds.toString().padStart(2, '0')}`;
+  } else {
+    return t.toFixed(2);
+  }
+};
 
   function unpack(packedList) {
     let unpacked = [];
@@ -231,4 +270,13 @@ img.game_piece {
     cursor: pointer;
     transform: translate(-50%, -50%);
 }
+
+.player-name {
+  font-size: 0.05;
+}
+
+.clock-text {
+  font-size: 0.04;
+}
+
 </style>

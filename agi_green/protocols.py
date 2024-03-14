@@ -357,7 +357,13 @@ class WebSocketProtocol(Protocol):
         kwargs['cmd'] = cmd
         if self.socket is not None:
             try:
-                await self.socket.send_str(json.dumps(kwargs))
+                s = json.dumps(kwargs)
+            except Exception as e:
+                logger.error(f'ws send error: {e})')
+                logger.error(f'ws send error: {kwargs}')
+                return
+            try:
+                await self.socket.send_str(s)
             except Exception as e:
                 logger.error(f'ws send error: {e} (queueing message)')
                 self.socket = None
@@ -371,9 +377,13 @@ class WebSocketProtocol(Protocol):
         if not self.is_server:
             assert self.socket is not None, "socket must be set"
 
-            while self.pre_connect_queue:
+            while self.pre_connect_queue and self.socket is not None:
                 kwargs = self.pre_connect_queue.pop(0)
                 await self.do_send(**kwargs)
+
+            if self.socket is None:
+                logger.error('websocket closed before queue was emptied')
+                return
 
             self.add_task(self.ping_loop())
 
