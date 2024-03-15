@@ -4,13 +4,17 @@
         <svg ref="svgBoard" :viewBox="'0 0 1 1'" style="width: 100%; height: 100%;" @click="handleClick">
             <defs>
             <image id="clocksOverlay" :href="clocks_image" width="1" height="1" />
-            <image v-for="piece in pieces" :key="piece.id" :id="`def_${piece.id}_${game_id}`" :href="piece.image"
+            <image v-for="(piece, id) in pieces" :key="id" :id="`def_${id}_${game_id}`" :href="piece.image"
                 :width="piece.scale" :height="piece.scale" />
             </defs>
             <use href="#clocksOverlay" x="0" y="0" />
             <use v-for="element in pieceElements" :key="element.uid" :href="`#def_${element.piece}_${game_id}`"
-            :x="locations[element.location].coords[0] - pieces[0].scale / 2"
-            :y="locations[element.location].coords[1] - pieces[0].scale / 2" />
+            :x="locations[element.location].coords[0] - pieces[element.piece].scale / 2"
+            :y="locations[element.location].coords[1] - pieces[element.piece].scale / 2" />
+
+            <use v-for="annotation in annotationElements" :key="annotation.uid" :href="`#def_${annotation.piece}_${game_id}`"
+            :x="locations[annotation.location].coords[0] - pieces[annotation.piece].scale / 2"
+            :y="locations[annotation.location].coords[1] - pieces[annotation.piece].scale / 2" />
 
             <text x="0.14" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.b }}</text>
             <text x="0.86" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.w }}</text>
@@ -28,6 +32,13 @@
 
   const send_ws = inject('send_ws');
 
+  function arrayToObj(array) {
+    return array.reduce((obj, item) => {
+        obj[item.id] = item;
+        return obj;
+    }, {});
+  }
+
   const props = defineProps({
     board_image: String,
     clocks_image: String,
@@ -40,15 +51,26 @@
   const svgBoard = ref(null);
   const board_image = ref(props.board_image);
   const clocks_image = ref(props.clocks_image);
-  const pieces = ref(props.pieces);
-  const locations = ref(props.locations);
+  const pieces = ref(arrayToObj(props.pieces));
+  const locations = ref(arrayToObj(props.locations));
   const pieceElements = ref([]);
+  const annotationElements = ref([]);
   const allowed = ref([]);
   const nextUid = ref({});
   const game_id = ref(props.game_id);
   const player_names = ref(props.player_names);
   const clockTimes = ref({ b: 0, w: 0 }); // in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is real time t0, 0 means 0:00
 
+const checkElements = () => {
+    // Check if all pieces and annotations are defined
+    for (const element of pieceElements.value.concat(annotationElements.value)) {
+        if (!pieces.value[element.piece]) {
+            console.error(`Piece ${element.piece} not defined`);
+            return false;
+        }
+    }
+    return true;
+};
 
 const clockText = (time) => {
     // time: in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is t0, 0 means 0:00
@@ -74,53 +96,6 @@ const clockText = (time) => {
     return t.toFixed(2);
   }
 };
-
-  function unpack(packedList) {
-    let unpacked = [];
-
-    for (let packedData of packedList) {
-        // Convert all values to arrays
-        let lists = {};
-        for (let key in packedData) {
-            lists[key] = Array.isArray(packedData[key]) ? packedData[key] : [packedData[key]];
-        }
-
-        let keys = Object.keys(lists);
-        let combinations = cartesianProduct(...Object.values(lists));
-
-        for (let combination of combinations) {
-            let unpackedItem = {};
-            keys.forEach((key, index) => {
-                unpackedItem[key] = combination[index];
-            });
-            unpacked.push(unpackedItem);
-        }
-    }
-
-    return unpacked;
-}
-
-function cartesianProduct(...arrays) {
-    return arrays.reduce((a, b) => {
-        return a.map(x => {
-            return b.map(y => {
-                return x.concat([y]);
-            });
-        }).reduce((a, b) => a.concat(b), []);
-    }, [[]]);
-}
-
-function index_key(key, arr) {
-    return arr.reduce((acc, obj) => {
-        if (obj[key]) {
-            if (!acc[obj[key]]) {
-                acc[obj[key]] = [];
-            }
-            acc[obj[key]].push(obj);
-        }
-        return acc;
-    }, {});
-}
 
   const boardStyle = computed(() => ({
     backgroundImage: `url(${board_image.value})`,
@@ -209,13 +184,24 @@ function index_key(key, arr) {
         };
         pieceElements.value.push(pieceElement);
     }
+
+    if (msg.annotations) {
+        // replace annotations
+        annotationElements.value = msg.annotations;
+    }
+    else {
+        // remove annotations
+        annotationElements.value = [];
+    }
+
+    checkElements();
   };
 
 
   const handlers = {
     ws_gameio_allow: (msg) => {
         if (msg.game_id === props.game_id) {
-          allowed.value = unpack(msg.moves);
+          allowed.value = msg.moves;
         }
     },
 
