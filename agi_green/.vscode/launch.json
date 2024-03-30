@@ -2,6 +2,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "chat.agi.green server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/chat.agi.green/chat_agi_green.py",
+            "args": [
+                "-H", "localhost",
+                "-p", "8000"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "LOG_LEVEL": "INFO"
+            }
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",

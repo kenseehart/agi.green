@@ -567,10 +567,9 @@ class GPTChatProtocol(Protocol):
             task = asyncio.create_task(self.get_completion())
 
     async def get_completion(self):
-        logger.info('skipping GPT4 completion')
-        #loop = asyncio.get_event_loop()
-        #content = await loop.run_in_executor(None, self.sync_completion)
-        #await self.send('mq', 'chat', channel='chat.public', author=self.uid, content=content)
+        loop = asyncio.get_event_loop()
+        content = await loop.run_in_executor(None, self.sync_completion)
+        await self.send('mq', 'chat', channel='chat.public', author=self.uid, content=content)
 
     def sync_completion(self):
         try:

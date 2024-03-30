@@ -9,6 +9,8 @@
 | [**brain**](/docs/brain) | *Getting Started on brain.agi.green* |
 | [**cim**](/docs/cim) | *Contention Induced Mitosis* |
 | [**combat**](/docs/combat) | *Combat* |
+| [**copilot alternatives**](/docs/copilot alternatives) | *My thoughts on various AI coding tools* |
+| [**gnn**](/docs/gnn) | *GNN Architecture for Game of Y* |
 | [**models**](/docs/models) | *How models.yaml works* |
 | [**othello**](/docs/othello) | *Othello Paper - Ideas* |
 | [**positions**](/docs/positions) | *POVNet Position Protocol* |
@@ -17,3 +19,4 @@
 | [**symmetry**](/docs/symmetry) | *Minor notes:* |
 | [**training**](/docs/training) | *Training status* |
 | [**training_strategies**](/docs/training_strategies) | *Training Strategies* |
+| [**yart**](/docs/yart) | *Yet Another Rendering Tool (YART)* |
