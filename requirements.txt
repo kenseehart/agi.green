@@ -6,3 +6,6 @@ openai
 pyyaml
 flask==2.3.3
 aiofiles
+pymongo
+motor
+pytest-asyncio

@@ -7,13 +7,12 @@ import logging
 import asyncio
 
 from agi_green.dispatcher import Dispatcher
-from agi_green.protocols import WebSocketProtocol, HTTPServerProtocol, HTTPSessionProtocol, RabbitMQProtocol, GPTChatProtocol, CommandProtocol
+from agi_green.protocol_ws import WebSocketProtocol
+from agi_green.protocol_mq import RabbitMQProtocol
+from agi_green.protocol_chat import GPTChatProtocol
+from agi_green.protocol_cmd import CommandProtocol
+from agi_green.protocol_http import HTTPServerProtocol, HTTPSessionProtocol
 from agi_green.config import Config
-
-# RabbitMQ port 5672
-# VScode debug port 5678
-# Browser port -p option (default=8000)
-# WebSocket port is browser port + 1 (default=8001)
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
@@ -117,8 +116,8 @@ class ChatSession(Dispatcher):
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
         # broadcast to all (including sender, which will echo back to browser)
-        if not content.startswith('!'):
-            await self.send('mq', 'chat', channel=self.active_channel, author=self.username, content=content)
+        #if not content.startswith('!'):
+        await self.send('mq', 'chat', channel=self.active_channel, author=self.username, content=content)
 
     async def on_mq_chat(self, channel_id:str, author:str, content:str):
         'receive chat message from RabbitMQ'
