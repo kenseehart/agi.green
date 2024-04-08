@@ -10,14 +10,14 @@ import re
 import asyncio
 from collections import defaultdict
 from typing import Callable, Awaitable, Dict, Any, Tuple, List
-from types import MethodType
+from types import MethodType, FunctionType
 import logging
 import inspect
 from functools import wraps
 import weakref
 import time
 import gc
-from typing import Iterator
+from .dict_namespace import DictNamespace
 
 if '-D' in sys.argv:
     log_format = '%(name)s - %(levelname)s - %(message)s'
@@ -115,6 +115,18 @@ class IgnoreException(Exception):
 
 _protocol_garbage_tracker = None
 
+def protocol_handler(_func=None, *, priority=2, update=False):
+    def decorator(func):
+        setattr(func, 'priority', priority)
+        setattr(func, 'update', update)
+        setattr(func, 'is_protocol_handler', True)
+        return func
+
+    if isinstance(_func, FunctionType):
+        return decorator(_func)
+
+    return decorator
+
 class Protocol:
     _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
 
@@ -129,6 +141,7 @@ class Protocol:
 
     def __init__(self):
         super().__init__()
+        self.context = DictNamespace()
         self.parent: 'Protocol' = None
         self.children: List['Protocol'] = []
         self.exception = Exception
@@ -155,8 +168,11 @@ class Protocol:
         # Register methods with the "on_" prefix
         for key in dir(self):
             m = re_on_cmd.match(key)
+            method = getattr(self, key)
             if m:
-                method = getattr(self, key)
+                if not hasattr(method, 'is_protocol_handler'):
+                    logger.warning(f'protocol handler {key} not decorated => {format_method(method)}')
+                    continue
                 if isinstance(method, MethodType):
                     proto, cmd = m.groups()
                     if method not in registry[proto][cmd]:
@@ -164,6 +180,9 @@ class Protocol:
                         method = getattr(self, key)
                         registry[proto][cmd].append(method)
                         logger.debug(f'Registered {proto}:{cmd} => {format_method(method)}')
+            else:
+                if hasattr(method, 'is_protocol_handler'):
+                    logger.error(f'protocol handler name syntax error: {format_method(method)}')
 
     @property
     def _root(self):
@@ -181,6 +200,10 @@ class Protocol:
         if self._registered_methods_cache is None:
             self._registered_methods_cache = defaultdict(lambda: defaultdict(list))
             self._register_methods()
+            # sort by priority
+            for proto, cmds in self._registered_methods_cache.items():
+                for cmd, handlers in cmds.items():
+                    self._registered_methods_cache[proto][cmd] = sorted(handlers, key=lambda x: x.priority)
         return self._registered_methods_cache
 
     @property
@@ -195,9 +218,19 @@ class Protocol:
 
     def add_protocol(self, protocol: "Protocol"):
         protocol.parent = self
+
+        self.context.update(protocol.context)
+        protocol.context = self.context
+
+        for p in protocol.all_children:
+            p.context = self.context
+
         self.children.append(protocol)
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
+
+        if self.parent is None:
+            self.context[protocol.protocol_id] = DictNamespace()
 
     def add_protocols(self, *protocols: "Protocol"):
         for p in protocols:
@@ -285,7 +318,7 @@ class Protocol:
                     v[1] = time.time() + 30 # prevent repeated warnings for this orphan for 30 seconds
 
     async def handle_mesg(self, cmd:str, **kwargs):
-        'receive message from any protocol and dispatch to registered handler'
+        'receive message from any protocol and dispatch to registered handlers, return last non-None response'
         logger.info(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
 
         # call registered handler
@@ -295,7 +328,17 @@ class Protocol:
             for handler in cmd_handlers:
                 response = None
                 try:
-                    response = await handler(**kwargs) or response
+                    r = await handler(**kwargs)
+
+                    if handler.update:
+                        if isinstance(r, dict):
+                            kwargs.update(r)
+                            r = kwargs # update mode returns the updated kwargs
+                        else:
+                            logger.error(f'{format_method(handler)} must return a dict (update mode)')
+
+                    if r is not None:
+                        response = r
                 except self.exception as e:
                     logger.error(e, exc_info=True)
             return response
@@ -305,7 +348,7 @@ class Protocol:
     async def send(self, protocol_id, cmd:str, **kwargs):
         'send message via specified protocol'
         logger.info(f'sending: {protocol_id}:{format_call(cmd, kwargs)}')
-        await self._root.get_protocol(protocol_id).do_send(cmd, **kwargs)
+        return await self._root.get_protocol(protocol_id).do_send(cmd, **kwargs)
 
     async def do_send(self, cmd: str, **kwargs):
         'default: send request to self - override to implement a protocol specific send'
@@ -322,6 +365,7 @@ class Dispatcher(Protocol):
         super().__init__()
         self.session_id = session_id
         self.stop_event = asyncio.Event()
+        self.context = DictNamespace()
 
     async def run(self):
         'run the dispatcher in additive async mode (concurrent dispatchers use run()).'

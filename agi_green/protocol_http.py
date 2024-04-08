@@ -13,7 +13,7 @@ from os.path import exists
 from aiohttp import web, WSMsgType
 from openai import OpenAI
 
-from agi_green.dispatcher import Protocol, format_call
+from agi_green.dispatcher import Protocol, format_call, protocol_handler
 from agi_green.config import Config
 
 here = dirname(__file__)
@@ -118,9 +118,11 @@ class HTTPServerProtocol(Protocol):
         self.add_task(super().run())
 
         self.app = web.Application()
+        # on_http_* methods are handled by HTTPSessionProtocol
         #handle_websocket_request
         self.app.router.add_get('/ws', self.handle_websocket_request)  # Delegate WebSocket connections
         self.app.router.add_get('/{filename:.*}', self.handle_http_request)
+        self.app.router.add_post('/{filename:.*}', self.handle_http_request)
         self.app.router.add_get('/', self.handle_http_request, name='index')
 
         # Check if SSL context is provided for HTTPS
@@ -234,64 +236,89 @@ class HTTPSessionProtocol(Protocol):
         return index_file
 
     async def handle_request(self, request:web.Request):
-        filename = request.match_info['filename'] or 'index.html'
-
-        if filename == 'index.html':
-            # since we are serving index.html, we need to reset the socket in case this is a refresh
-            self._root.get_protocol('ws').socket = None
-
-        query = request.query.copy()
-
-        if filename == 'docs':
-            file_path_md = self.index_md()
-            filename = 'docs/index'
-        else:
-            # check for filename+'.md' and serve that instead with query: view=render
-            file_path_md = self.find_static(filename+'.md')
-
-        if file_path_md is not None:
-            query.add('view','render')
-            file_path = file_path_md
-            filename = filename+'.md'
-        else:
-            file_path = self.find_static(filename)
-
-        if file_path is None:
-            for h in self.static_handlers:
-                file_path = h(filename)
-                if file_path is not None:
-                    break
+        def safe_add(url, data, key, value):
+            if key in data:
+                logger.error(f'POST {url} namespace collision on field `{key}`')
             else:
-                return web.HTTPNotFound()
+                data[key] = value
 
-        ext = os.path.splitext(filename)[1]
-        content_type = text_content_types.get(ext, None) # None means binary
+        if request.method == 'POST':
+            data = dict(await request.post())
+            safe_add(request.url, data, 'request_url', str(request.url))
+            safe_add(request.url, data, 'request_method', str(request.method))
 
-        if content_type == 'text/markdown':
-            format = query.get('view', 'raw')
+            cmd = data['request_url'].split('/')[3]
+            response = await self.handle_mesg(cmd, **data)
+            if response is None:
+                logger.error(f'POST {cmd} no response (did the handler forget to return something?)')
+                return web.HTTPMethodNotAllowed() # 405
+            elif isinstance(response, web.Response):
+                return response
+            elif isinstance(response, str):
+                return web.Response(text=response, content_type='text/plain')
+            else:
+                logger.error(f'POST {cmd} invalid return type')
+                return web.Response(text='invalid return type', content_type='text/plain')
 
-            if format == 'raw':
-                return web.FileResponse(file_path)
+        elif request.method == 'GET':
+            filename = request.match_info['filename'] or 'index.html'
 
-            if not os.path.exists(file_path) or not os.path.isfile(file_path):
-                raise web.HTTPNotFound()
+            if filename == 'index.html':
+                # since we are serving index.html, we need to reset the socket in case this is a refresh
+                self._root.get_protocol('ws').socket = None
 
-            with open(file_path, 'r') as f:
-                content = f.read()
+            query = request.query.copy()
 
-            # serve the index.html file. The open_md message will populate the md viewer
-            file_path = self.find_static('index.html')
+            if filename == 'docs':
+                file_path_md = self.index_md()
+                filename = 'docs/index'
+            else:
+                # check for filename+'.md' and serve that instead with query: view=render
+                file_path_md = self.find_static(filename+'.md')
 
-            # since we are serving index.html, we need to reset the socket
-            self._root.get_protocol('ws').socket = None
+            if file_path_md is not None:
+                query.add('view','render')
+                file_path = file_path_md
+                filename = filename+'.md'
+            else:
+                file_path = self.find_static(filename)
 
-            # queue up the message (will be queued until after the websocket is connected)
-            await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
+            if file_path is None:
+                for h in self.static_handlers:
+                    file_path = h(filename)
+                    if file_path is not None:
+                        break
+                else:
+                    return web.HTTPNotFound()
 
-            return await self.serve_file(file_path)
+            ext = os.path.splitext(filename)[1]
+            content_type = text_content_types.get(ext, None) # None means binary
 
-        else:
-            return await self.serve_file(file_path)
+            if content_type == 'text/markdown':
+                format = query.get('view', 'raw')
+
+                if format == 'raw':
+                    return web.FileResponse(file_path)
+
+                if not os.path.exists(file_path) or not os.path.isfile(file_path):
+                    raise web.HTTPNotFound()
+
+                with open(file_path, 'r') as f:
+                    content = f.read()
+
+                # serve the index.html file. The open_md message will populate the md viewer
+                file_path = self.find_static('index.html')
+
+                # since we are serving index.html, we need to reset the socket
+                self._root.get_protocol('ws').socket = None
+
+                # queue up the message (will be queued until after the websocket is connected)
+                await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
+
+                return await self.serve_file(file_path)
+
+            else:
+                return await self.serve_file(file_path)
 
 
     @staticmethod

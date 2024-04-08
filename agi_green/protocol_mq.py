@@ -9,7 +9,7 @@ from os.path import exists
 
 import aio_pika
 
-from agi_green.dispatcher import Protocol, format_call
+from agi_green.dispatcher import Protocol, format_call, protocol_handler
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)

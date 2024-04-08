@@ -10,7 +10,7 @@ from os.path import exists
 
 from aiohttp import web
 
-from agi_green.dispatcher import Protocol, format_call
+from agi_green.dispatcher import Protocol, format_call, protocol_handler
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ class WebSocketProtocol(Protocol):
             logger.info(f'queuing ws: {format_call(cmd, kwargs)}')
             self.pre_connect_queue.append(kwargs)
 
+    @protocol_handler
     async def on_ws_connect(self):
         'websocket connected'
         if not self.is_server:
@@ -80,6 +81,7 @@ class WebSocketProtocol(Protocol):
 
             self.add_task(self.ping_loop())
 
+    @protocol_handler
     async def on_ws_disconnect(self):
         'websocket disconnected'
         self.socket = None

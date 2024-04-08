@@ -6,7 +6,7 @@ import random
 import logging
 import asyncio
 
-from agi_green.dispatcher import Dispatcher
+from agi_green.dispatcher import Dispatcher, protocol_handler
 from agi_green.protocol_ws import WebSocketProtocol
 from agi_green.protocol_mq import RabbitMQProtocol
 from agi_green.protocol_chat import GPTChatProtocol
@@ -100,6 +100,7 @@ class ChatSession(Dispatcher):
     def __del__(self):
         logger.info(f'{self} deleted')
 
+    @protocol_handler
     async def on_ws_connect(self):
         'post connection node setup'
         logger.info(f'{self} connected')
@@ -107,22 +108,26 @@ class ChatSession(Dispatcher):
         await self.mq.subscribe('chat.public')
         self.active_channel = 'chat.public'
 
+    @protocol_handler
     async def on_ws_disconnect(self):
         'post connection node cleanup'
         logger.info(f'{self} disconnected')
         self.server.remove_node(self)
         self.add_task(self.close())
 
+    @protocol_handler
     async def on_ws_chat_input(self, content:str=''):
         'receive chat input from browser via websocket'
         # broadcast to all (including sender, which will echo back to browser)
         #if not content.startswith('!'):
         await self.send('mq', 'chat', channel=self.active_channel, author=self.username, content=content)
 
+    @protocol_handler
     async def on_mq_chat(self, channel_id:str, author:str, content:str):
         'receive chat message from RabbitMQ'
         await self.send('ws', 'append_chat', author=author, content=content)
 
+    @protocol_handler
     async def on_cmd_user_info(self, **kwargs):
         'receive user info'
 

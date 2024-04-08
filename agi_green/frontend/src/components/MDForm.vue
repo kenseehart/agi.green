@@ -23,6 +23,10 @@ export default {
         watch(() => props.yamlSchema, (newVal) => {
             if (newVal) {
                 const content = jsYaml.load(newVal);
+                content.schema.form_id = {
+                    type: 'hidden',
+                    default: content.id,
+                };
                 console.log('YAML', content);
                 vueform.value.schema = content.schema;
             }
@@ -31,6 +35,10 @@ export default {
         watch(() => props.jsonSchema, (newVal) => {
             if (newVal) {
                 const content = JSON.parse(newVal);
+                content.schema.form_id = {
+                    type: 'hidden',
+                    default: content.id,
+                };
                 console.log('JSON:', content);
                 vueform.value.schema = content.schema;
             }

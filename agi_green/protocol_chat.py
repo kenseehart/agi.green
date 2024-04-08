@@ -8,7 +8,7 @@ import logging
 from aiohttp import web, WSMsgType
 from openai import OpenAI
 
-from agi_green.dispatcher import Protocol, format_call
+from agi_green.dispatcher import Protocol, format_call, protocol_handler
 from agi_green.config import Config
 
 here = dirname(__file__)
@@ -53,16 +53,19 @@ class GPTChatProtocol(Protocol):
             {"role": "system", "content": "You are a helpful assistant."},
         ]
 
+    @protocol_handler
     async def on_ws_form_data(self, cmd:str, data:dict):
         key = data.get('key')
         self.config.set('openai.key', key)
         self.messages.append({"role": "system", "content": "OpenAI API key was just now set by the user."})
         await self.get_completion()
 
+    @protocol_handler
     async def on_ws_connect(self):
         await self.send('ws', 'set_user_data', uid='bot', name='GPT-4', icon='/avatars/agibot.png')
         await self.send('ws', 'set_user_data', uid='info', name='InfoBot', icon='/avatars/infobot.png')
 
+    @protocol_handler
     async def on_mq_chat(self, channel_id:str, author:str, content:str):
         'receive chat message from RabbitMQ'
         if author != self.uid:

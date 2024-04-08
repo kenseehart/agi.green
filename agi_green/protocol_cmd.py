@@ -7,7 +7,7 @@ import logging
 from os.path import exists
 import ast
 
-from agi_green.dispatcher import Protocol, format_call
+from agi_green.dispatcher import Protocol, format_call, protocol_handler
 from agi_green.config import Config
 
 here = dirname(__file__)
@@ -56,8 +56,9 @@ class CommandProtocol(Protocol):
     async def run(self):
         self.add_task(super().run())
 
+    @protocol_handler(priority=1, update=True)
     async def on_ws_chat_input(self, content:str):
-        'receive command syntax on the mq chat channel'
+        'handle command syntax on chat input'
 
         # [cmd:gameio_start(game='y93', players=['user1', 'user2'])]
 
@@ -72,10 +73,11 @@ class CommandProtocol(Protocol):
             except Exception as e:
                 result = f'error: {e}'
 
-            if result is None:
-                result = f'error: {call_str} command not found'
+            # replace the matched command with the result
+            if result:
+                content = content.replace(match.group(0), result)
 
-            await self.send('ws', 'append_chat', author='info', content=result)
+        return {'content': content}
 
     async def do_send(self, cmd:str, **kwargs):
         '''cmd can be a function call expression like "foo(x=5, y='333')" or a simple function name like "foo"'''
