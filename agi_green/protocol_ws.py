@@ -26,8 +26,8 @@ class WebSocketProtocol(Protocol):
     '''
     protocol_id: str = 'ws'
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, parent:Protocol):
+        super().__init__(parent)
         self.socket:web.WebSocketResponse = None
         self.pre_connect_queue = []
 

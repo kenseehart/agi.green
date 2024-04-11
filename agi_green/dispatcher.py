@@ -18,6 +18,7 @@ import weakref
 import time
 import gc
 from .dict_namespace import DictNamespace
+from .config_namespace import ConfigNamespace
 
 if '-D' in sys.argv:
     log_format = '%(name)s - %(levelname)s - %(message)s'
@@ -129,26 +130,25 @@ def protocol_handler(_func=None, *, priority=2, update=False):
 
 class Protocol:
     _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
-
+    dispatcher: 'Dispatcher'
     protocol_id: str = ''
 
     @property
     def is_server(self) -> bool:
         'True if this protocol instance is a server'
-        if self is self._root:
+        if self is self.dispatcher:
             return False
-        return self._root.is_server
+        return self.dispatcher.is_server
 
-    def __init__(self):
-        super().__init__()
-        self.context = DictNamespace()
-        self.parent: 'Protocol' = None
+    def __init__(self, parent: 'Protocol' = None):
+        parent.add_protocol(self) if parent else None
         self.children: List['Protocol'] = []
         self.exception = Exception
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
         self.running_tasks = []
         self._closed = False
+        logger.info(f'created: {type(self)}')
 
     def __repr__(self):
         r =  self.__class__.__name__
@@ -158,7 +158,7 @@ class Protocol:
 
     def _register_methods(self):
         'Register methods for a protocol'
-        registry = self._root._registered_methods_cache
+        registry = self.dispatcher._registered_methods_cache
         re_on_cmd = re.compile(r'^on_(\w+?)_(\w+)$')
 
         # Register methods for children
@@ -169,6 +169,8 @@ class Protocol:
         for key in dir(self):
             m = re_on_cmd.match(key)
             method = getattr(self, key)
+            if not isinstance(method, FunctionType|MethodType):
+                continue
             if m:
                 if not hasattr(method, 'is_protocol_handler'):
                     logger.warning(f'protocol handler {key} not decorated => {format_method(method)}')
@@ -183,11 +185,6 @@ class Protocol:
             else:
                 if hasattr(method, 'is_protocol_handler'):
                     logger.error(f'protocol handler name syntax error: {format_method(method)}')
-
-    @property
-    def _root(self):
-        'Return root protocol (dispatcher)'
-        return self.parent._root if self.parent else self
 
     @property
     def all_children(self) -> List['Protocol']:
@@ -218,23 +215,11 @@ class Protocol:
 
     def add_protocol(self, protocol: "Protocol"):
         protocol.parent = self
-
-        self.context.update(protocol.context)
+        protocol.dispatcher = self.dispatcher
         protocol.context = self.context
-
-        for p in protocol.all_children:
-            p.context = self.context
-
         self.children.append(protocol)
         self._registered_methods_cache = None
         self._registered_protocols_cache = None
-
-        if self.parent is None:
-            self.context[protocol.protocol_id] = DictNamespace()
-
-    def add_protocols(self, *protocols: "Protocol"):
-        for p in protocols:
-            self.add_protocol(p)
 
     def get_protocol(self, protocol_id: str) -> "Protocol":
         try:
@@ -322,7 +307,7 @@ class Protocol:
         logger.info(f'received: {self.protocol_id}:{format_call(cmd, kwargs)}')
 
         # call registered handler
-        cmd_handlers = self._root.registered_methods[self.protocol_id][cmd]
+        cmd_handlers = self.dispatcher.registered_methods[self.protocol_id][cmd]
 
         if cmd_handlers:
             for handler in cmd_handlers:
@@ -348,7 +333,7 @@ class Protocol:
     async def send(self, protocol_id, cmd:str, **kwargs):
         'send message via specified protocol'
         logger.info(f'sending: {protocol_id}:{format_call(cmd, kwargs)}')
-        return await self._root.get_protocol(protocol_id).do_send(cmd, **kwargs)
+        return await self.dispatcher.get_protocol(protocol_id).do_send(cmd, **kwargs)
 
     async def do_send(self, cmd: str, **kwargs):
         'default: send request to self - override to implement a protocol specific send'
@@ -363,9 +348,17 @@ class Dispatcher(Protocol):
 
     def __init__(self, session_id:str=None):
         super().__init__()
+        self.dispatcher = self
         self.session_id = session_id
         self.stop_event = asyncio.Event()
-        self.context = DictNamespace()
+        self.context = DictNamespace(1)
+
+        if not hasattr(Protocol, 'config'):
+            # Set the config for all protocols globally
+            Protocol.config = ConfigNamespace(
+                '$WORKSPACE/chat.agi.green/agi_config.yaml',
+                '$WORKSPACE/chat.agi.green/agi_config_default.yaml',
+                depth=2)
 
     async def run(self):
         'run the dispatcher in additive async mode (concurrent dispatchers use run()).'
@@ -376,7 +369,7 @@ class Dispatcher(Protocol):
 
         # Start all registered async run methods concurrently
         for p in self.children:
-            logger.info(f'mq task launched for {self}:{id(self)}->{p}')
+            #logger.info(f'task launched for {self}:{id(self)}->{p}')
             self.add_task(p.run())
 
         if _protocol_garbage_tracker is None:

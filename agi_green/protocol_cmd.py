@@ -49,9 +49,8 @@ class CommandProtocol(Protocol):
     '''
     protocol_id: str = 'cmd'
 
-    def __init__(self, config:Config, **kwargs):
-        super().__init__(**kwargs)
-        self.config = config
+    def __init__(self, parent:Protocol):
+        super().__init__(parent)
 
     async def run(self):
         self.add_task(super().run())

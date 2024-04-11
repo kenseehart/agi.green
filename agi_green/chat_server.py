@@ -44,16 +44,7 @@ class ChatServer(Dispatcher):
         self.root = root
         self.server = self
         self.port = port
-        self.config = Config(
-            join(here, 'agi_config.yaml'),
-            join(here, 'agi_config_default.yaml'),
-        )
-
-        self.http = HTTPServerProtocol(self.session_class, host=host, port=port, ssl_context=ssl_context, redirect=redirect)
-
-        self.add_protocols(
-            self.http,
-        )
+        self.http = HTTPServerProtocol(self, host=host, port=port, ssl_context=ssl_context, redirect=redirect)
 
         self.nodes = {}
 
@@ -69,33 +60,25 @@ class ChatSession(Dispatcher):
     To customize, we recommend you start by copying and replacing this class with your own.
     '''
 
-    def __init__(self, server:ChatServer, session_id, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, server:ChatServer, session_id:str='', **kwargs):
+        super().__init__()
         self.server = server
-        self.username = f'guest_{get_uid(8)}'
+        self.context.user.screen_name = f'guest_{get_uid(8)}'
+        self.context.server = server.context
         self.session_id = session_id
-        self.config = Config(
-            join(here, 'agi_config.yaml'),
-            join(here, 'agi_config_default.yaml'),
-        )
+
 
         rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
 
-        self.http = HTTPSessionProtocol()
-        self.ws = WebSocketProtocol()
-        self.mq = RabbitMQProtocol(host=rabbitmq_host)
-        self.cmd = CommandProtocol(self.config)
+        self.http = HTTPSessionProtocol(self)
+        self.ws = WebSocketProtocol(self)
+        self.mq = RabbitMQProtocol(self, host=rabbitmq_host)
+        self.cmd = CommandProtocol(self)
 
-        self.add_protocols(
-            self.http,
-            self.ws,
-            self.mq,
-            self.cmd,
-        )
-        logger.info(f'{type(self).__name__} {self.username} created: rabbitmq={rabbitmq_host}')
+        logger.info(f'{type(self).__name__} {self.context.user.screen_name} created: rabbitmq={rabbitmq_host}')
 
     def __repr__(self):
-        return f'{super().__repr__()} {self.username}'
+        return f'{super().__repr__()} {self.context.user.screen_name}'
 
     def __del__(self):
         logger.info(f'{self} deleted')
@@ -106,7 +89,7 @@ class ChatSession(Dispatcher):
         logger.info(f'{self} connected')
         await self.mq.subscribe('broadcast')
         await self.mq.subscribe('chat.public')
-        self.active_channel = 'chat.public'
+        self.context.chat.active_channel = 'chat.public'
 
     @protocol_handler
     async def on_ws_disconnect(self):
@@ -120,7 +103,7 @@ class ChatSession(Dispatcher):
         'receive chat input from browser via websocket'
         # broadcast to all (including sender, which will echo back to browser)
         #if not content.startswith('!'):
-        await self.send('mq', 'chat', channel=self.active_channel, author=self.username, content=content)
+        await self.send('mq', 'chat', channel=self.context.chat.active_channel, author=self.context.user.screen_name, content=content)
 
     @protocol_handler
     async def on_mq_chat(self, channel_id:str, author:str, content:str):

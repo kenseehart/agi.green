@@ -28,9 +28,8 @@ class GPTChatProtocol(Protocol):
 
     _openai_client: OpenAI = None
 
-    def __init__(self, config:Config, **kwargs):
-        super().__init__(**kwargs)
-        self.config = config
+    def __init__(self, parent:Protocol):
+        super().__init__(parent)
         self.name = 'agi.green'
         self.uid = 'bot'
 

@@ -1,27 +1,49 @@
-from typing import Any
-
-import json
+from typing import Any, Callable
 import hashlib
+import asyncio
+import weakref
+import os
 
 def hash_mutable(obj):
-    # Serialize the object to a JSON string, sorting keys to ensure consistent order
-    obj_str = json.dumps(obj)
-    # Use hashlib to create a hash of the serialized string
-    return hashlib.sha256(obj_str.encode('utf-8')).hexdigest()
+    return hashlib.sha256(str(obj).encode('utf-8')).hexdigest()
 
 class DictNamespace(dict):
-    '''A javascript style object for attribute access to dict keys
-    Attributes starting with _ are not stored in the dict (unless written as dict keys) so they can be used for internal state
-    Only collisions are explicit access of dict methods (e.g. copy, items, keys, ...) which retain dict behavior
-    But these may safely be accessed as dict keys, e.g. obj['items']=123
+    '''An asychronous reactive javascript style dict for attribute access to keys
+    Attributes starting with _ are stored as actual attributes, not in the dict (unless written as dict keys) so they can be used for internal state
+    Pre-existing attributes have priority, such as dict methods (e.g. copy, items, keys, ...)
+    But these name may safely be accessed as dict keys, e.g. obj['items']=123, assert obj['items']==123, iter(obj.items())
+    Collisions only occur when such attributes are explicitly set, e.g. obj.items=456 => ValueError
 
     Content is expected to be json serializable
-    '''
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._dirty_hash = hash_mutable(self)
 
-    def deep_update(self, d):
+    _default is the default value for missing attributes.
+    Unlike defaultdict, the default value only applies to attribute access, not dict access
+
+    _depth is the number of layers that are DictNamespace by default.
+    _default is the default leaf value (or callable to generate it)
+    note that unlike defaultdict, you don't need to wrap the default in a lambda
+
+    You can make variable depth simply by assigning a DictNamespace()
+
+    You can attach change handlers to the object with _bind_change_handler(handler).
+    '''
+    def __init__(self, _depth=0, _default: Any=None, **kwargs):
+        super().__init__(**kwargs)
+
+        if _depth > 0:
+            self._default = lambda: DictNamespace(_depth=_depth-1, _default=_default)
+        else:
+            if isinstance(_default, Callable):
+                self._default = _default
+            else:
+                self._default = lambda: _default
+
+        self._dirty_hashes = {}
+
+        if kwargs:
+            self._deep_update(kwargs)
+
+    def _deep_update(self, d):
         'update self with d, recursively updating any dicts in self. Recursion stops one level below DictNamespace nodes.'
         for k, v in d.items():
             if k in self:
@@ -32,7 +54,7 @@ class DictNamespace(dict):
 
                 if isinstance(v0, DictNamespace):
                     if isinstance(v, dict):
-                        v0.deep_update(v)
+                        v0._deep_update(v)
                     else:
                         raise ValueError(f"Cannot update DictNamespace with non-dict {v}")
                 elif isinstance(v0, dict):
@@ -41,32 +63,83 @@ class DictNamespace(dict):
                     else:
                         raise ValueError(f"Cannot update dict with non-dict {v}")
             else:
-                self[k] = v
+                if isinstance(v, dict) and isinstance(getattr(self, k, None), DictNamespace):
+                    self[k]._deep_update(v)
+                else:
+                    self[k] = v
 
-    @property
-    def _changed(self):
-        'return True if the object has been changed since the last time this was called'
+    def _changed(self, key:str):
+        'return True if the object has been changed since the last time this was called with this key'
         h = hash_mutable(self)
-        if h != self._dirty_hash:
-            self._dirty_hash = h
+        if h != self._dirty_hashes.get(key):
+            self._dirty_hashes[key] = h
             return True
         return False
 
+    def _ensure_finalization(self):
+        'ensure that the object is _dead when it is garbage collected'
+        if not hasattr(self, '_dead'):
+            weakref.finalize(self, self._kill)
+            self._dead = False
+
+    def _kill(self):
+        'kill the object'
+        self._dead = True
+
+    async def _bind_change_handler(self, handler:Callable, delay:float=0.1):
+        'asyncronously call handler whenever this object changes, within the delay'
+        key = id(handler)
+        self._ensure_finalization()
+
+        async def change_loop():
+            while not self._dead:
+                if self._changed(key):
+                    await handler()
+                await asyncio.sleep(delay)
+
+        asyncio.create_task(change_loop())
+
     def __getattr__(self, name):
+        if name.startswith('_'):
+            raise AttributeError(name)
+
         try:
-            return super().__getattribute__(name)
-        except AttributeError:
-            try:
-                return self[name]
-            except KeyError as e:
-                raise AttributeError(f"Attribute {name} not found") from e
+            return self[name]
+        except KeyError:
+            self[name] = self._default()
+            return self[name]
+
+    def _expandvars(self):
+        'replace $VAR with os.environ["VAR"] for all strings, return the modified object'
+
+        def expandvars(x):
+            if isinstance(x, str):
+                return os.path.expandvars(x)
+            elif isinstance(x, dict):
+                return DictNamespace(**{k: expandvars(v) for k, v in x.items()})
+            elif isinstance(x, list):
+                return [expandvars(v) for v in x]
+            else:
+                return x
+
+        return expandvars(self)
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith('_'):
             super().__setattr__(name, value)
         else:
-            self[name] = value
+            try:
+                super().__getattribute__(name)
+                raise AttributeError(f"Cannot set predefined attribute `{name}`. Use obj['{name}'] instead, or use `_{name}` for internal state")
+            except AttributeError:
+                self[name] = value
 
     def __delattr__(self, name: str) -> None:
-        del self[name]
+        if name.startswith('_'):
+            super().__delattr__(name)
+        else:
+            del self[name]
+
+
+
 

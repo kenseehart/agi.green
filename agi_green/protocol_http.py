@@ -15,6 +15,7 @@ from openai import OpenAI
 
 from agi_green.dispatcher import Protocol, format_call, protocol_handler
 from agi_green.config import Config
+from agi_green.config_namespace import DictNamespace
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
@@ -43,8 +44,9 @@ class HTTPServerProtocol(Protocol):
 
     protocol_id: str = 'http'
 
-    def __init__(self, session_class, host:str='0.0.0.0', port:int=8000, ssl_context=None, redirect=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, parent:Protocol, host:str='0.0.0.0', port:int=8000, ssl_context=None, redirect=None):
+        super().__init__(parent)
+
         self.host = host
         self.port = port
         self.redirect = redirect
@@ -52,7 +54,7 @@ class HTTPServerProtocol(Protocol):
         self.app:web.Application = None
         self.runner:web.AppRunner = None
         self.site:web.TCPSite = None
-        self.session_class = session_class
+        self.session_class = parent.session_class
         self.sessions:Dict[str, Protocol] = {}
 
     async def http_to_https_redirect(self, request):
@@ -70,6 +72,9 @@ class HTTPServerProtocol(Protocol):
         try:
             session = self.sessions[session_id]
         except KeyError:
+            session = None
+
+        if session is None:
             session:Protocol = self.session_class(self, session_id=session_id)
             self.sessions[session_id] = session
             self.add_task(session.run())
@@ -80,6 +85,7 @@ class HTTPServerProtocol(Protocol):
         session, new_session_id = self.get_or_create_session(request)
         http:HTTPSessionProtocol = session.get_protocol('http')
         response:web.StreamResponse = await http.handle_request(request)
+        self.context.host = request.host
 
         if new_session_id:
             if response is None:
@@ -176,8 +182,8 @@ class HTTPSessionProtocol(Protocol):
 
     protocol_id: str = 'http'
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, parent:Protocol):
+        super().__init__(parent)
         self.static = [join(here, 'static'), join(here, 'frontend', 'dist')]
         self.static_handlers:List[Callable] = []
 
@@ -236,36 +242,41 @@ class HTTPSessionProtocol(Protocol):
         return index_file
 
     async def handle_request(self, request:web.Request):
-        def safe_add(url, data, key, value):
-            if key in data:
-                logger.error(f'POST {url} namespace collision on field `{key}`')
-            else:
-                data[key] = value
+        data = DictNamespace()
 
         if request.method == 'POST':
-            data = dict(await request.post())
-            safe_add(request.url, data, 'request_url', str(request.url))
-            safe_add(request.url, data, 'request_method', str(request.method))
+            data.update(await request.post())
 
-            cmd = data['request_url'].split('/')[3]
+        data.update(request.query)
+
+        if request.url.name and data and '.' not in request.url.name:
+            # it might be a command, so try sending it to http protocol handlers
+            data.request_url = str(request.url)
+            data.request_method = str(request.method)
+            cmd = request.url.name
             response = await self.handle_mesg(cmd, **data)
-            if response is None:
-                logger.error(f'POST {cmd} no response (did the handler forget to return something?)')
-                return web.HTTPMethodNotAllowed() # 405
-            elif isinstance(response, web.Response):
-                return response
-            elif isinstance(response, str):
-                return web.Response(text=response, content_type='text/plain')
-            else:
-                logger.error(f'POST {cmd} invalid return type')
-                return web.Response(text='invalid return type', content_type='text/plain')
 
-        elif request.method == 'GET':
+            if response is not None:
+                if isinstance(response, web.Response):
+                    return response
+                elif isinstance(response, str):
+                    return web.Response(text=response, content_type='text/plain')
+                else:
+                    logger.error(f'{data.request_method} {cmd} invalid return type')
+                    return web.Response(text='invalid return type', content_type='text/plain')
+            else:
+                if data.request_method == 'POST':
+                    logger.error(f'POST {cmd} no response (did the handler forget to return something?)')
+                    return web.HTTPMethodNotAllowed() # 405
+
+            # otherwise, let the ordinary http processing have a go at it...
+
+        if request.method == 'GET':
             filename = request.match_info['filename'] or 'index.html'
 
             if filename == 'index.html':
                 # since we are serving index.html, we need to reset the socket in case this is a refresh
-                self._root.get_protocol('ws').socket = None
+                self.dispatcher.get_protocol('ws').socket = None
 
             query = request.query.copy()
 
@@ -310,7 +321,7 @@ class HTTPSessionProtocol(Protocol):
                 file_path = self.find_static('index.html')
 
                 # since we are serving index.html, we need to reset the socket
-                self._root.get_protocol('ws').socket = None
+                self.dispatcher.get_protocol('ws').socket = None
 
                 # queue up the message (will be queued until after the websocket is connected)
                 await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
