@@ -9,7 +9,7 @@ import asyncio
 from agi_green.dispatcher import Dispatcher, protocol_handler
 from agi_green.protocol_ws import WebSocketProtocol
 from agi_green.protocol_mq import RabbitMQProtocol
-from agi_green.protocol_chat import GPTChatProtocol
+from agi_green.protocol_gpt import GPTChatProtocol
 from agi_green.protocol_cmd import CommandProtocol
 from agi_green.protocol_http import HTTPServerProtocol, HTTPSessionProtocol
 from agi_green.config import Config
