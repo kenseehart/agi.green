@@ -6,6 +6,7 @@
 | [**protocols**](/docs/protocols) | *Summary of protocols.py* |
 | [**vue_client**](/docs/vue_client) | *AGI Green Vue client* |
 | [**ann**](/docs/ann) | *Symmetry and Discrete Equivariance - ANN architecture for Game of Y* |
+| [**bots**](/docs/bots) | *Proposed agent specifications* |
 | [**brain**](/docs/brain) | *Getting Started on brain.agi.green* |
 | [**cim**](/docs/cim) | *Contention Induced Mitosis* |
 | [**combat**](/docs/combat) | *Combat* |

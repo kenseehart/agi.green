@@ -89,7 +89,13 @@ class ChatSession(Dispatcher):
         logger.info(f'{self} connected')
         await self.mq.subscribe('broadcast')
         await self.mq.subscribe('chat.public')
+        user_channel = f'user.{self.context.user.screen_name}'
+        await self.mq.subscribe(user_channel)
         self.context.chat.active_channel = 'chat.public'
+
+        welcome = self.config.welcome_message
+        await self.send('mq', 'chat', channel=user_channel, author='info', content=welcome)
+
 
     @protocol_handler
     async def on_ws_disconnect(self):

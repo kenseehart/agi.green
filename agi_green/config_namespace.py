@@ -28,7 +28,7 @@ yaml.add_representer(str, multiline_str_representer)
 
 class ConfigNamespace(DictNamespace):
     'Configuration namespace asynchonously mirrored to yaml'
-    def __init__(self, filepath:str, default_filepath:str=None, depth=0, delay:float=0.1, **kwargs):
+    def __init__(self, filepath:str, default_filepath:str=None, depth=0, delay:float=0.1, writeable=False, **kwargs):
         '''filepath: path to yaml file or env var if prefixed with $
         default_filepath: path to copy to filepath if it doesn't exist
         delay: time to wait between checking for changes to the yaml file
@@ -36,6 +36,7 @@ class ConfigNamespace(DictNamespace):
         super().__init__(depth, **kwargs)
         self._filepath = os.path.expandvars(filepath)
         self._delay = delay
+        self._writeable = writeable
 
         if not os.path.exists(self._filepath):
             # Create directory if it doesn't exist
@@ -50,6 +51,7 @@ class ConfigNamespace(DictNamespace):
                     f.write('{}')
 
         self._yaml_timestamp = 0 # last time the yaml file was read or written
+        self._changed('yaml') # clear the change flag
         asyncio.create_task(self._sync_yaml_loop())
 
     def _yaml_changed(self):
@@ -60,7 +62,7 @@ class ConfigNamespace(DictNamespace):
 
     async def _sync_yaml(self):
         'sync yaml file to data and data to yaml file if changed. You may need to await this manually if you want to force a sync.'
-        data_changed = self._changed('yaml')
+        data_changed = self._writeable and self._changed('yaml')
         file_changed = self._yaml_changed()
 
         if file_changed:

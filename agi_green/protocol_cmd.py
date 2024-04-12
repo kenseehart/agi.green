@@ -1,3 +1,22 @@
+'''cmd protocol
+
+This protocol handles custom commands. Output is a string.
+
+To invoke a command from a chat message, use the following syntax:
+
+`[cmd:command_name(arg1=value1, arg2=value2, ...)]`
+
+The command text is replaced with the result of the command.
+
+To invoke a command programmatically, use the following syntax:
+
+`result = await self.send('cmd', 'command_name', arg1=value1, arg2=value2, ...)`
+
+And you can use the ws protocol to send the result to the chat:
+
+`await self.send('ws', 'append_chat', author='info', message=result)`
+'''
+
 import os
 from os.path import join, dirname, splitext, isabs
 import re

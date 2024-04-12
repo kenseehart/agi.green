@@ -87,7 +87,7 @@ class RabbitMQProtocol(Protocol):
                        await self.handle_mesg(channel_id=channel_id, **data)
 
         del self.queues[channel_id]
-        logger.info(f'{self.dispatcher.context.screen_name} unsubscribed from {channel_id}')
+        logger.info(f'{self.dispatcher.context.user.screen_name} unsubscribed from {channel_id}')
 
     async def subscribe(self, channel_id: str):
         if not self.connected:
@@ -98,7 +98,7 @@ class RabbitMQProtocol(Protocol):
             queue = await self.channel.declare_queue(exclusive=True)
             await queue.bind(self.exchange, routing_key=channel_id)
             self.queues[channel_id] = queue
-            logger.info(f'{self.dispatcher.context.screen_name} subscribed to {channel_id}')
+            logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {channel_id}')
 
             self.add_task(self.listen_to_queue(channel_id, queue))
 

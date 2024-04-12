@@ -243,6 +243,7 @@ class HTTPSessionProtocol(Protocol):
 
     async def handle_request(self, request:web.Request):
         data = DictNamespace()
+        url = str(request.url)
 
         if request.method == 'POST':
             data.update(await request.post())
@@ -251,9 +252,10 @@ class HTTPSessionProtocol(Protocol):
 
         if request.url.name and data and '.' not in request.url.name:
             # it might be a command, so try sending it to http protocol handlers
-            data.request_url = str(request.url)
+            data.request_url = url
             data.request_method = str(request.method)
-            cmd = request.url.name
+            cmd = request.url.path[1:].replace('/', '_')
+
             response = await self.handle_mesg(cmd, **data)
 
             if response is not None:
@@ -267,7 +269,7 @@ class HTTPSessionProtocol(Protocol):
             else:
                 if data.request_method == 'POST':
                     logger.error(f'POST {cmd} no response (did the handler forget to return something?)')
-                    return web.HTTPMethodNotAllowed() # 405
+                    return web.Response(text=f'no response to POST {cmd}', content_type='text/plain')
 
             # otherwise, let the ordinary http processing have a go at it...
 

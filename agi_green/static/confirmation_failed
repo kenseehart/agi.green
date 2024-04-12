@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmation Failed</title>
+</head>
+<body>
+    <h1>Email Confirmation Failed</h1>
+    <p>We're sorry, but we could not confirm your email address. This may be due to an invalid or expired confirmation link.</p>
+    <p>Try resending the registration, or ask the chat assistent for help.</p>
+    <p>Please close this window, return to the main window</p>
+</body>
+</html>
