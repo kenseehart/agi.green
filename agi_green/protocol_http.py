@@ -14,7 +14,6 @@ from aiohttp import web, WSMsgType
 from openai import OpenAI
 
 from agi_green.dispatcher import Protocol, format_call, protocol_handler
-from agi_green.config import Config
 from agi_green.config_namespace import DictNamespace
 
 here = dirname(__file__)

@@ -44,29 +44,21 @@ class DictNamespace(dict):
             self._deep_update(kwargs)
 
     def _deep_update(self, d):
-        'update self with d, recursively updating any dicts in self. Recursion stops one level below DictNamespace nodes.'
+        'update self with d recursively'
         for k, v in d.items():
-            if k in self:
-                v0 = self[k]
-                if isinstance(v, DictNamespace):
-                    if isinstance(v0, dict):
-                        self.k = v0 = DictNamespace(v0)
+            v0 = self.get(k, None)
 
-                if isinstance(v0, DictNamespace):
-                    if isinstance(v, dict):
-                        v0._deep_update(v)
-                    else:
-                        raise ValueError(f"Cannot update DictNamespace with non-dict {v}")
-                elif isinstance(v0, dict):
-                    if isinstance(v, dict):
-                        v0.update(v)
-                    else:
-                        raise ValueError(f"Cannot update dict with non-dict {v}")
+            if isinstance(v, dict) and isinstance(v0, dict):
+                if not isinstance(v0, DictNamespace):
+                    v0 = DictNamespace(**v)
+                    self[k]=v0
+
+                v0._deep_update(v)
             else:
-                if isinstance(v, dict) and isinstance(getattr(self, k, None), DictNamespace):
-                    self[k]._deep_update(v)
-                else:
-                    self[k] = v
+                if isinstance(v, dict) and not isinstance(v, DictNamespace):
+                    v = DictNamespace(**v)
+
+                self[k] = v
 
     def _changed(self, key:str):
         'return True if the object has been changed since the last time this was called with this key'

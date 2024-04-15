@@ -9,7 +9,6 @@ from aiohttp import web, WSMsgType
 from openai import OpenAI
 
 from agi_green.dispatcher import Protocol, format_call, protocol_handler
-from agi_green.config import Config
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)

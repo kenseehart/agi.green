@@ -10,7 +10,10 @@ import weakref
 async def load_yaml(file_path) -> dict:
     async with aiofiles.open(file_path, 'r') as f:
         content = await f.read()
-    r = yaml.safe_load(content)
+    try:
+        r = yaml.safe_load(content)
+    except:
+        r = None
     return r
 
 async def save_yaml(file_path, data:dict):
@@ -67,13 +70,14 @@ class ConfigNamespace(DictNamespace):
 
         if file_changed:
             data = await load_yaml(self._filepath)
-            if self == {}:
-                data_changed = False
-                self.clear()
+            if data is not None:
+                if self == {}:
+                    data_changed = False
+                    self.clear()
 
-            self._deep_update(data) # _deep_update ensures that DictNamespace objects are applied to depth
+                self._deep_update(data) # _deep_update ensures that DictNamespace objects are applied to depth
 
-            self._changed('yaml') # clear the change
+                self._changed('yaml') # clear the change
 
         if data_changed:
             await save_yaml(self._filepath, self)

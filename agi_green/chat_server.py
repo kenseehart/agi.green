@@ -12,7 +12,6 @@ from agi_green.protocol_mq import RabbitMQProtocol
 from agi_green.protocol_gpt import GPTChatProtocol
 from agi_green.protocol_cmd import CommandProtocol
 from agi_green.protocol_http import HTTPServerProtocol, HTTPSessionProtocol
-from agi_green.config import Config
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
