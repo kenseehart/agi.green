@@ -53,7 +53,7 @@ class HTTPServerProtocol(Protocol):
         self.app:web.Application = None
         self.runner:web.AppRunner = None
         self.site:web.TCPSite = None
-        self.session_class = parent.session_class
+        self.session_class = self.dispatcher.session_class
         self.sessions:Dict[str, Protocol] = {}
 
     async def http_to_https_redirect(self, request):
@@ -87,11 +87,15 @@ class HTTPServerProtocol(Protocol):
         self.context.host = request.host
 
         if new_session_id:
+            logger.info(f'New session: {new_session_id}')
             if response is None:
                 logger.error(f'Request failed on new session {new_session_id} on http request:')
                 logger.error(f'  {request}')
-            response.set_cookie('SESSION_ID', new_session_id)
-            logger.info(f'New session: {new_session_id}')
+            else:
+                response.set_cookie('SESSION_ID', new_session_id, max_age=60*60*24*365)
+                logger.info(f'New session: {new_session_id}')
+        else:
+            logger.info(f'Existing session: {session.session_id}')
 
         return response
 

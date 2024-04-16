@@ -64,7 +64,7 @@ class ChatSession(Dispatcher):
         self.server = server
         self.context.user.screen_name = f'guest_{get_uid(8)}'
         self.context.server = server.context
-        self.session_id = session_id
+        self.context.session_id = session_id
 
 
         rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
@@ -90,6 +90,8 @@ class ChatSession(Dispatcher):
         await self.mq.subscribe('chat.public')
         user_channel = f'user.{self.context.user.screen_name}'
         await self.mq.subscribe(user_channel)
+        await self.mq.subscribe('session.'+self.context.session_id)
+
         self.context.chat.active_channel = 'chat.public'
 
         welcome = self.config.welcome_message
