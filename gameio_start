@@ -1,1 +1,1 @@
-!gameio_start(game='y9', players=['guest_33aff39c', 'guest_31640f4e'])
+[cmd:gameio_start(game='y9', time_control='2+2', players=['Ken', 'Ken2'])]

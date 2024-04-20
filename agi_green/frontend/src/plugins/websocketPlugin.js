@@ -18,6 +18,7 @@ export default {
         app.provide('send_ws', (cmd, data = {}) => {
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ cmd, ...data }));
+                console.log('sending ws:', cmd, data);
             } else {
                 console.error('WebSocket is not open');
             }

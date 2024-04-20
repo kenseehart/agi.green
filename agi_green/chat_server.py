@@ -94,8 +94,10 @@ class ChatSession(Dispatcher):
 
         self.context.chat.active_channel = 'chat.public'
 
-        welcome = self.config.welcome_message
-        await self.send('mq', 'chat', channel=user_channel, author='info', content=welcome)
+        if not self.context.user.email:
+            # guest user
+            welcome = self.config.welcome_message
+            await self.send('mq', 'chat', channel=user_channel, author='info', content=welcome)
 
 
     @protocol_handler

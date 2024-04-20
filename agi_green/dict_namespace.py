@@ -124,6 +124,8 @@ class DictNamespace(dict):
                 super().__getattribute__(name)
                 raise AttributeError(f"Cannot set predefined attribute `{name}`. Use obj['{name}'] instead, or use `_{name}` for internal state")
             except AttributeError:
+                if isinstance(value, dict):
+                    value = DictNamespace(**value)
                 self[name] = value
 
     def __delattr__(self, name: str) -> None:

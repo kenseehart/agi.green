@@ -18,8 +18,8 @@
 
             <text x="0.14" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.b }}</text>
             <text x="0.86" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.w }}</text>
-            <text x="0.14" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockText(clockTimes.b) }}</text>
-            <text x="0.86" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockText(clockTimes.w) }}</text>
+            <text x="0.14" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockTextB }}</text>
+            <text x="0.86" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockTextW }}</text>
 
         </svg>
         </div>
@@ -27,39 +27,39 @@
 </template>
 
 <script setup>
-  import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
-  import { bind_handlers, unbind_handlers } from '@/emitter';
+import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { bind_handlers, unbind_handlers } from '@/emitter';
 
-  const send_ws = inject('send_ws');
+const send_ws = inject('send_ws');
 
-  function arrayToObj(array) {
+function arrayToObj(array) {
     return array.reduce((obj, item) => {
         obj[item.id] = item;
         return obj;
     }, {});
-  }
+}
 
-  const props = defineProps({
+const props = defineProps({
     board_image: String,
     clocks_image: String,
     locations: Object,
     pieces: Object,
     game_id: String,
     player_names: Object,
-  });
+});
 
-  const svgBoard = ref(null);
-  const board_image = ref(props.board_image);
-  const clocks_image = ref(props.clocks_image);
-  const pieces = ref(arrayToObj(props.pieces));
-  const locations = ref(arrayToObj(props.locations));
-  const pieceElements = ref([]);
-  const annotationElements = ref([]);
-  const allowed = ref([]);
-  const nextUid = ref({});
-  const game_id = ref(props.game_id);
-  const player_names = ref(props.player_names);
-  const clockTimes = ref({ b: 0, w: 0 }); // in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is real time t0, 0 means 0:00
+const svgBoard = ref(null);
+const board_image = ref(props.board_image);
+const clocks_image = ref(props.clocks_image);
+const pieces = ref(arrayToObj(props.pieces));
+const locations = ref(arrayToObj(props.locations));
+const pieceElements = ref([]);
+const annotationElements = ref([]);
+const allowed = ref([]);
+const nextUid = ref({});
+const game_id = ref(props.game_id);
+const player_names = ref(props.player_names);
+const clockTimes = ref({ b: 0, w: 0 }); // in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is absolute time t0, 0 means 0:00
 
 const checkElements = () => {
     // Check if all pieces and annotations are defined
@@ -72,9 +72,33 @@ const checkElements = () => {
     return true;
 };
 
+/*
+About time:
+
+There are two conventions for time:
+
+UI time: time displayed on the clock
+    relative or absolute time in seconds,
+      negative means clock is stopped and value is time remaining,
+      positive means clock is running and it's value is t0 (the absolute time when the clock will run out)
+
+API time: time communicated to and from the server
+    relative time in seconds,
+      negative means clock is stopped and value is time remaining
+      positive means clock is running and value is time remaining
+
+*/
+
 const clockText = (time) => {
-    // time: in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is t0, 0 means 0:00
+    // time: relative or absolute time in seconds,
+    //   negative means clock is stopped and value is time remaining,
+    //   positive means clock is running and it's value is t0 (the absolute time when the clock will run out)
     // t is the actual time remaining
+
+    if (time === undefined) {
+        console.error("Time is undefined");
+        return "-:--";
+    }
 
     var t;
 
@@ -88,41 +112,94 @@ const clockText = (time) => {
         }
     }
 
-  if (t >= 60) {
-    const minutes = Math.floor(t / 60);
-    const seconds = Math.floor(t % 60);
-    return `${minutes}M:${seconds.toString().padStart(2, '0')}`;
-  } else {
-    return t.toFixed(2);
-  }
+    if (t >= 3600) {
+        const hours = Math.floor(t / 3600);
+        const minutes = Math.floor((t % 3600) / 60);
+        return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    }
+    else if (t >= 60) {
+        const minutes = Math.floor(t / 60);
+        const seconds = Math.floor(t % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    else {
+        return t.toFixed(1);
+    }
 };
 
-  const boardStyle = computed(() => ({
+const clockTextB = computed(() => {
+    return clockText(clockTimes.value.b);
+});
+
+const clockTextW = computed(() => {
+    return clockText(clockTimes.value.w);
+});
+
+
+const updateClockDisplay = () => {
+    for (const key in clockTimes.value) {
+        if (clockTimes.value[key] > 0) { // Ensure the clock is running
+            const millis = Math.floor(clockTimes.value[key] * 1000);
+
+            // XOR adjustment based on the current millisecond value
+            if (millis % 2 === 0) {
+                // Even millisecond: increment time by 1ms (0.001 seconds)
+                clockTimes.value[key] += 0.001;
+            } else {
+                // Odd millisecond: decrement time by 1ms (0.001 seconds)
+                clockTimes.value[key] -= 0.001;
+            }
+        }
+    }
+};
+
+
+const updateClock = (clock) => {
+    // clock: {b: time, w: time}
+    // time: relative time in seconds,
+    //   negative means clock is stopped and value is time remaining
+    //   positive means clock is running and value is time remaining
+
+    for (const player in clock) {
+        if (clock[player] > 0) {
+            clockTimes.value[player] = Date.now() / 1000 + clock[player];
+        }
+        else {
+            clockTimes.value[player] = clock[player];
+        }
+    }
+};
+
+const stopAndGetClock = () => {
+    // Stop the clock and return the time remaining (as negative seconds)
+    for (const player in clockTimes.value) {
+        if (clockTimes.value[player] > 0) {
+            clockTimes.value[player] = Date.now() / 1000 - clockTimes.value[player];
+        }
+    }
+    return { ...clockTimes.value };
+};
+
+
+const boardStyle = computed(() => ({
     backgroundImage: `url(${board_image.value})`,
     backgroundSize: 'cover', // Use 'cover' to ensure the image covers without stretching
     backgroundPosition: 'center', // Center the background image
     width: '100%', // Full width
     height: '100%' // Full height
-  }));
+}));
 
-  const initStyles = () => {
-    // Append the stylesheet for game board
-    const styleLink = document.createElement('link');
-    styleLink.setAttribute('rel', 'stylesheet');
-    styleLink.setAttribute('href', '/gameio.css');
-    document.head.appendChild(styleLink);
-  };
 
-  const newUid = (piece) => {
+const newUid = (piece) => {
     if (!nextUid.value[piece]) {
-      nextUid.value[piece] = 0;
+        nextUid.value[piece] = 0;
     } else {
-      nextUid.value[piece]++;
+        nextUid.value[piece]++;
     }
     return `${piece}_${nextUid.value[piece]}`;
-  };
+};
 
-  const handleClick = (event) => {
+const handleClick = (event) => {
     const rect = svgBoard.value.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -135,29 +212,29 @@ const clockText = (time) => {
     const move = allowed.value.find(move => move.dest === clickedLocationId);
 
     if (move) {
-      move.game_id = props.game_id;
-      doMove(move);
-      // Assuming send_ws is a global function to send websocket messages
-      send_ws('gameio_move', move);
+        move.game_id = props.game_id;
+        move.clock = stopAndGetClock();
+        doMove(move);
+        send_ws('gameio_move', move);
     }
-  };
+};
 
-  const getLocationIdAt = (locations, relX, relY, radius = 0.05) => {
+const getLocationIdAt = (locations, relX, relY, radius = 0.05) => {
     let closestId = null;
     let closestDist = Infinity;
 
     for (const loc of Object.values(locations)) {
-      const [locX, locY] = loc.coords;
-      const d = Math.sqrt((relX - locX) ** 2 + (relY - locY) ** 2);
-      if (d < radius && d < closestDist) {
+        const [locX, locY] = loc.coords;
+        const d = Math.sqrt((relX - locX) ** 2 + (relY - locY) ** 2);
+        if (d < radius && d < closestDist) {
         closestDist = d;
         closestId = loc.id;
-      }
+        }
     }
     return closestId;
-  };
+};
 
-  const doMove = (msg) => {
+const doMove = (msg) => {
     console.log("doMove:", msg);
     allowed.value = [];
 
@@ -195,30 +272,36 @@ const clockText = (time) => {
     }
 
     checkElements();
-  };
+};
 
 
-  const handlers = {
+const handlers = {
     ws_gameio_allow: (msg) => {
         if (msg.game_id === props.game_id) {
-          allowed.value = msg.moves;
+            allowed.value = msg.moves;
         }
     },
 
     ws_gameio_move: (msg) => {
         if (msg.game_id === props.game_id) {
-          doMove(msg);
+            doMove(msg);
+        }
+        if (msg.clock) {
+            updateClock(msg.clock);
         }
     },
-  };
+};
 
-  onMounted(() => {
+onMounted(() => {
     bind_handlers(handlers);
-  });
+    const interval = setInterval(updateClockDisplay, 100);  // Update at 10Hz
 
-  onBeforeUnmount(() => {
-    unbind_handlers(handlers);
-  });
+    onBeforeUnmount(() => {
+        clearInterval(interval);
+        unbind_handlers(handlers);
+    });
+});
+
 </script>
 
 <style scoped>
