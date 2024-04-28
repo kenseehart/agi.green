@@ -1,34 +1,46 @@
 <template>
     <div class="game-container">
         <div class="game-board" :style="boardStyle">
-        <svg ref="svgBoard" :viewBox="'0 0 1 1'" style="width: 100%; height: 100%;" @click="handleClick">
-            <defs>
-            <image id="clocksOverlay" :href="clocks_image" width="1" height="1" />
-            <image v-for="(piece, id) in pieces" :key="id" :id="`def_${id}_${game_id}`" :href="piece.image"
-                :width="piece.scale" :height="piece.scale" />
-            </defs>
-            <use href="#clocksOverlay" x="0" y="0" />
-            <use v-for="element in pieceElements" :key="element.uid" :href="`#def_${element.piece}_${game_id}`"
-            :x="locations[element.location].coords[0] - pieces[element.piece].scale / 2"
-            :y="locations[element.location].coords[1] - pieces[element.piece].scale / 2" />
+            <svg ref="svgBoard" :viewBox="'0 0 1 1'" style="width: 100%; height: 100%;" @click="handleClick">
+                <defs>
+                <image id="clocksOverlay" :href="clocks_image" width="1" height="1" />
+                <image v-for="(piece, id) in pieces" :key="id" :id="`def_${id}_${game_id}`" :href="piece.image"
+                    :width="piece.scale" :height="piece.scale" />
+                </defs>
+                <use href="#clocksOverlay" x="0" y="0" />
+                <use v-for="element in pieceElements" :key="element.uid" :href="`#def_${element.piece}_${game_id}`"
+                :x="locations[element.location].coords[0] - pieces[element.piece].scale / 2"
+                :y="locations[element.location].coords[1] - pieces[element.piece].scale / 2" />
 
-            <use v-for="annotation in annotationElements" :key="annotation.uid" :href="`#def_${annotation.piece}_${game_id}`"
-            :x="locations[annotation.location].coords[0] - pieces[annotation.piece].scale / 2"
-            :y="locations[annotation.location].coords[1] - pieces[annotation.piece].scale / 2" />
+                <use v-for="annotation in annotationElements" :key="annotation.uid" :href="`#def_${annotation.piece}_${game_id}`"
+                :x="locations[annotation.location].coords[0] - pieces[annotation.piece].scale / 2"
+                :y="locations[annotation.location].coords[1] - pieces[annotation.piece].scale / 2" />
 
-            <text x="0.14" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.b }}</text>
-            <text x="0.86" y="0.06" class="player-name" text-anchor="middle" font-size="0.025">{{ player_names.w }}</text>
-            <text x="0.14" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockTextB }}</text>
-            <text x="0.86" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockTextW }}</text>
+                <text x="0.14" y="0.06" class="player-name" text-anchor="middle" font-size="0.027">{{ player_names.b }}</text>
+                <text x="0.86" y="0.06" class="player-name" text-anchor="middle" font-size="0.027">{{ player_names.w }}</text>
+                <text x="0.14" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockTextB }}</text>
+                <text x="0.86" y="0.15" class="clock-text" text-anchor="middle" font-size="0.06">{{ clockTextW }}</text>
 
-        </svg>
+                <g v-if="showResignButton===1">
+                    <SvgButton :label="resignText" x="0.05" y="0.22" text-anchor="start" font-size="0.025" @clicked="resignGame('b')" />
+                </g>
+
+                <g v-if="showResignButton===2">
+                    <SvgButton :label="resignText" x="0.95" y="0.22" text-anchor="end" font-size="0.025" @clicked="resignGame('w')" />
+                </g>
+
+                <text x="0.05" y="0.22" class="clock-text" text-anchor="start" font-size="0.025">{{ resultTextB }}</text>
+                <text x="0.95" y="0.22" class="clock-text" text-anchor="end" font-size="0.025">{{ resultTextW }}</text>
+            </svg>
         </div>
     </div>
 </template>
 
 <script setup>
-import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { inject, ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+
 import { bind_handlers, unbind_handlers } from '@/emitter';
+import SvgButton from './SvgButton.vue';
 
 const send_ws = inject('send_ws');
 
@@ -46,6 +58,7 @@ const props = defineProps({
     pieces: Object,
     game_id: String,
     player_names: Object,
+    roles: Array,
 });
 
 const svgBoard = ref(null);
@@ -60,6 +73,21 @@ const nextUid = ref({});
 const game_id = ref(props.game_id);
 const player_names = ref(props.player_names);
 const clockTimes = ref({ b: 0, w: 0 }); // in seconds, negative means clock is stopped and value is time remaining, positive means clock is running and value is absolute time t0, 0 means 0:00
+const resultTextB = ref('');
+const resultTextW = ref('');
+const winner = ref('');
+const roles = ref(props.roles); // player: ['b'] or ['w'], watcher: [], teacher: ['b', 'w']
+const moveIndex = ref(0); // move index of current board state on the client, which is moveList.value.length+1 if we made a move that hasn't been echoed back from the server, otherwise moveList.value.length
+const moveList = ref([]); // moves received from the server
+const resignText = ref('resign');
+
+// Show resign button if the game is not over and the player has a role: 1 for black, 2 for white
+const showResignButton = computed(() => winner.value ? 0 : roles.value.includes('b') ? 1 : roles.value.includes('w') ? 2 : 0);
+
+const resignGame = (role) => {
+    console.log("Resignation triggered by", role)
+    send_ws('gameio_move', { game_id: game_id.value, clock: stopAndGetClock(), role:role, i:moveIndex.value++, lose: 'resigned'})
+};
 
 const checkElements = () => {
     // Check if all pieces and annotations are defined
@@ -88,6 +116,8 @@ API time: time communicated to and from the server
       positive means clock is running and value is time remaining
 
 */
+
+
 
 const clockText = (time) => {
     // time: relative or absolute time in seconds,
@@ -139,7 +169,14 @@ const clockTextW = computed(() => {
 const updateClockDisplay = () => {
     for (const key in clockTimes.value) {
         if (clockTimes.value[key] > 0) { // Ensure the clock is running
-            const millis = Math.floor(clockTimes.value[key] * 1000);
+            if (Date.now()/1000 > clockTimes.value[key]) {
+                // timeout has occurred
+                clockTimes.value[key] = 0;
+                send_ws('gameio_move', { game_id: game_id.value, clock: clockTimes.value, role:key, i:moveIndex.value++, lose: 'out of time'})
+                return
+            }
+
+            const millis = Math.floor(clockTimes.value[key]*1000);
 
             // XOR adjustment based on the current millisecond value
             if (millis % 2 === 0) {
@@ -181,6 +218,7 @@ const stopAndGetClock = () => {
 };
 
 
+
 const boardStyle = computed(() => ({
     backgroundImage: `url(${board_image.value})`,
     backgroundSize: 'cover', // Use 'cover' to ensure the image covers without stretching
@@ -214,6 +252,12 @@ const handleClick = (event) => {
     if (move) {
         move.game_id = props.game_id;
         move.clock = stopAndGetClock();
+
+        if (moveIndex.value != moveList.value.length) {
+            console.error("Client move index out of sync with client move list", moveList.value.length, moveIndex.value, move);
+        }
+
+        move.i = moveIndex.value++;
         doMove(move);
         send_ws('gameio_move', move);
     }
@@ -284,12 +328,52 @@ const handlers = {
 
     ws_gameio_move: (msg) => {
         if (msg.game_id === props.game_id) {
-            doMove(msg);
-        }
-        if (msg.clock) {
-            updateClock(msg.clock);
+            if (msg.clock) {
+                updateClock(msg.clock);
+            }
+
+            if (msg.i == moveIndex.value) {
+                doMove(msg);
+            }
+            else
+            {
+                if (msg.i == moveIndex.value - 1) {
+                    console.info("Received echo of move", msg.i)
+                }
+                else {
+                    console.error("Incoming move.i out of sync with client board state", moveIndex.value, msg.i, msg);
+                }
+            }
+
+            if (moveList.value.length == msg.i) {
+                moveList.value.push(msg);
+                moveIndex.value = moveList.value.length;
+            }
+            else if (moveList.value.length == msg.i + 1) {
+                console.info("Received duplicate or collision of move", msg.i)
+                // TODO: check if the move is the same, if not, handle it
+            }
+            else {
+                console.error("Incoming move.i out of sync with client move list", moveList.value.length, msg.i, msg);
+            }
         }
     },
+
+    ws_gameio_status: (msg) => {
+        console.log("ws_gameio_status:", msg);
+        if (msg.game_id === props.game_id) {
+            winner.value = msg.winner;
+            if (msg.b) {
+                resultTextB.value = msg.b;
+            }
+            if (msg.w) {
+                resultTextW.value = msg.w;
+            }
+            if (msg.clock) {
+                updateClock(msg.clock);
+            }
+        }
+    }
 };
 
 onMounted(() => {
