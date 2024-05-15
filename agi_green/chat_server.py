@@ -63,7 +63,6 @@ class ChatSession(Dispatcher):
         super().__init__()
         self.server = server
         self.context.user.screen_name = f'guest_{get_uid(8)}'
-        self.context.server = server.context
         self.context.session_id = session_id
 
 

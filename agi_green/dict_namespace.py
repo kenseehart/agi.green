@@ -8,11 +8,13 @@ def hash_mutable(obj):
     return hashlib.sha256(str(obj).encode('utf-8')).hexdigest()
 
 class DictNamespace(dict):
-    '''An asychronous reactive javascript style dict for attribute access to keys
+    '''An optionally asychronous reactive javascript style dict for attribute access to keys
     Attributes starting with _ are stored as actual attributes, not in the dict (unless written as dict keys) so they can be used for internal state
     Pre-existing attributes have priority, such as dict methods (e.g. copy, items, keys, ...)
     But these name may safely be accessed as dict keys, e.g. obj['items']=123, assert obj['items']==123, iter(obj.items())
     Collisions only occur when such attributes are explicitly set, e.g. obj.items=456 => ValueError
+
+    Asynchronous only refers to the ability to bind change handlers to the object. If you don't use this feature, ignore async.
 
     Content is expected to be json serializable
 
