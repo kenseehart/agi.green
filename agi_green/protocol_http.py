@@ -95,7 +95,7 @@ class HTTPServerProtocol(Protocol):
                 response.set_cookie('SESSION_ID', new_session_id, max_age=60*60*24*365)
                 logger.info(f'New session: {new_session_id}')
         else:
-            logger.info(f'Existing session: {session.session_id}')
+            logger.info(f'Existing session: {session.context.session_id}')
 
         return response
 
@@ -195,16 +195,22 @@ class HTTPSessionProtocol(Protocol):
                 logger.warn(f'Static directory {static_dir}: does not exist')
                 logger.warn('Did you forget to run "npm run build" in the frontend directory?')
 
-    def add_static(self, path:str):
+    def add_static(self, path:str, index:int=None):
         'add static directory'
         if not exists(path):
             logger.warn(f'Static directory {path}: does not exist')
 
-        self.static.append(path)
+        if index is None:
+            self.static.append(path)
+        else:
+            self.static.insert(index, path)
 
-    def add_static_handler(self, handler:Callable):
+    def add_static_handler(self, handler:Callable, index:int=None):
         'add static handler'
-        self.static_handlers.append(handler)
+        if index is None:
+            self.static_handlers.append(handler)
+        else:
+            self.static_handlers.insert(index, handler)
 
     def find_static(self, filename:str):
         for static_dir in self.static:
