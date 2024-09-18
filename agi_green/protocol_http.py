@@ -190,10 +190,16 @@ class HTTPSessionProtocol(Protocol):
         self.static = [join(here, 'static'), join(here, 'frontend', 'dist')]
         self.static_handlers:List[Callable] = []
 
+        for static_dir in self.static:
+            if not exists(static_dir):
+                logger.warn(f'Static directory {static_dir}: does not exist')
+                logger.warn('Did you forget to run "npm run build" in the frontend directory?')
+
     def add_static(self, path:str):
         'add static directory'
         if not exists(path):
             logger.warn(f'Static directory {path}: does not exist')
+
         self.static.append(path)
 
     def add_static_handler(self, handler:Callable):
