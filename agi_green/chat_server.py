@@ -37,9 +37,10 @@ class ChatServer(Dispatcher):
         'True if this protocol is a server (default: False)'
         return True
 
-    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, session_class=None, ssl_context=None, redirect=None):
+    def __init__(self, root:str='.', host:str='0.0.0.0', port:int=8000, session_class=None, session_id=None, ssl_context=None, redirect=None):
         super().__init__()
         self.session_class = session_class or ChatSession
+        self.session_id = session_id
         self.root = root
         self.server = self
         self.port = port
