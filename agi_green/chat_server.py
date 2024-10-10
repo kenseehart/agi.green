@@ -9,7 +9,6 @@ import asyncio
 from agi_green.dispatcher import Dispatcher, protocol_handler
 from agi_green.protocol_ws import WebSocketProtocol
 from agi_green.protocol_mq import RabbitMQProtocol
-from agi_green.protocol_gpt import GPTChatProtocol
 from agi_green.protocol_cmd import CommandProtocol
 from agi_green.protocol_http import HTTPServerProtocol, HTTPSessionProtocol
 
@@ -122,15 +121,6 @@ class ChatSession(Dispatcher):
     @protocol_handler
     async def on_cmd_user_info(self, **kwargs):
         'receive user info'
-
-class ChatGPTSession(ChatSession):
-    '''ChatNode with GPT-4 joining in.
-
-    '''
-    def __init__(self, server:ChatServer, port:int=8000, rabbitmq_host:str='localhost'):
-        super().__init__(server, port, rabbitmq_host)
-        self.gpt = GPTChatProtocol(self.config)
-        self.add_protocol(self.gpt)
 
 
 def main():

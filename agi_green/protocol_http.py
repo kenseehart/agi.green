@@ -78,6 +78,10 @@ class HTTPServerProtocol(Protocol):
             self.sessions[session_id] = session
             self.add_task(session.run())
 
+        # Set the subdomain in the session context
+        host = request.host.split(':')[0]  # Remove port if present
+        session.context.subdomain = host
+
         return session, new_session_id
 
     async def handle_http_request(self, request:web.Request):

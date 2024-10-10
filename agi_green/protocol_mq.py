@@ -86,28 +86,41 @@ class RabbitMQProtocol(Protocol):
                     else:
                        await self.handle_mesg(channel_id=channel_id, **data)
 
-        del self.queues[channel_id]
-        logger.info(f'{self.dispatcher.context.user.screen_name} unsubscribed from {channel_id}')
+        full_channel_id = self.get_full_channel_id(channel_id)
+        del self.queues[full_channel_id]
+        logger.info(f'{self.dispatcher.context.user.screen_name} unsubscribed from {full_channel_id}')
+
+    def get_full_channel_id(self, channel_id: str) -> str:
+        if ':' in channel_id:
+            return channel_id
+        try:
+            subdomain = self.context.subdomain
+        except AttributeError:
+            raise ValueError("Subdomain is not set in the context. This is required for MQ operations.")
+        return f"{subdomain}:{channel_id}"
 
     async def subscribe(self, channel_id: str):
         if not self.connected:
             self.offline_subscription_queue.put(channel_id)
             return
 
-        if channel_id not in self.queues:
+        full_channel_id = self.get_full_channel_id(channel_id)
+        if full_channel_id not in self.queues:
             queue = await self.channel.declare_queue(exclusive=True)
-            await queue.bind(self.exchange, routing_key=channel_id)
-            self.queues[channel_id] = queue
-            logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {channel_id}')
+            await queue.bind(self.exchange, routing_key=full_channel_id)
+            self.queues[full_channel_id] = queue
+            logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
 
             self.add_task(self.listen_to_queue(channel_id, queue))
 
     async def unsubscribe(self, channel_id: str):
-        await self.send('mq', 'unsubscribe', channel=channel_id, sender_id=id(self))
+        full_channel_id = self.get_full_channel_id(channel_id)
+        await self.send('mq', 'unsubscribe', channel=full_channel_id, sender_id=id(self))
 
     async def unsubscribe_all(self):
         'unsubscribe to everything'
-        for channel_id in list(self.queues.keys()):
+        for full_channel_id in list(self.queues.keys()):
+            channel_id = full_channel_id.split(':', 1)[1] if ':' in full_channel_id else full_channel_id
             await self.unsubscribe(channel_id)
 
 
@@ -118,9 +131,10 @@ class RabbitMQProtocol(Protocol):
             return
 
         kwargs['cmd'] = cmd
+        full_channel = self.get_full_channel_id(channel)
 
         await self.exchange.publish(
             aio_pika.Message(body=json.dumps(kwargs).encode()),
-            routing_key=channel  # We use routing key as channel_id for direct exchanges
+            routing_key=full_channel  # We use routing key as full_channel for direct exchanges
         )
 

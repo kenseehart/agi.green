@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
 logging.basicConfig(level=log_level)
 
-
 class GPTChatProtocol(Protocol):
     '''
     OpenAI GPT Chat protocol
@@ -38,7 +37,7 @@ class GPTChatProtocol(Protocol):
             api_key = os.environ.get("OPENAI_API_KEY", None)
 
             if api_key is None:
-                raise Exception("OPENAI_API_KEY environment variable must be set")
+                raise Exception("gpt protocol needs OPENAI_API_KEY environment variable to be set")
 
             GPTChatProtocol._openai_client = OpenAI(api_key=api_key)
 
@@ -86,7 +85,7 @@ class GPTChatProtocol(Protocol):
                 messages=self.messages)
                 return response.choices[0].message.content
         except Exception as e:
-            msg = f'OpenAI API error: {e}'
+            msg = f'protocol_gpt: OpenAI API error: {e}'
             logger.error(msg)
             return f'<span style="color:red">{msg}</span>'
 
