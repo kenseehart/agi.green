@@ -11,6 +11,7 @@
 | [**cim**](/docs/cim) | *Contention Induced Mitosis* |
 | [**combat**](/docs/combat) | *Combat* |
 | [**copilot alternatives**](/docs/copilot alternatives) | *My thoughts on various AI coding tools* |
+| [**cursor_project**](/docs/cursor_project) | *Project Conventions for Cursor AI* |
 | [**gameio**](/docs/gameio) | *Game Communication Protocol* |
 | [**gnn**](/docs/gnn) | *GNN Architecture for Game of Y* |
 | [**ken**](/docs/ken) | *Résumé* |

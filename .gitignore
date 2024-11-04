@@ -2,6 +2,7 @@
 data/
 static/avatars/
 **/agi_config.yaml
+**/docs/index.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
