@@ -85,9 +85,10 @@ class HTTPServerProtocol(Protocol):
         return session, new_session_id
 
     async def handle_http_request(self, request:web.Request):
+        logger.info(f"HTTP Request received: {request.method} {request.path}")
         session, new_session_id = self.get_or_create_session(request)
         http:HTTPSessionProtocol = session.get_protocol('http')
-        response:web.StreamResponse = await http.handle_request(request)
+        response:web.StreamResponse|None = await http.handle_request(request)
         self.context.host = request.host
 
         if new_session_id:
@@ -161,8 +162,10 @@ class HTTPServerProtocol(Protocol):
             self.runner = web.AppRunner(self.app)
             await self.runner.setup()
             self.site = web.TCPSite(self.runner, self.host, self.port)
-            logger.info(f'Serving http://{self.host}:{self.port}')
             await self.site.start()
+            logger.info(f'Serving http://{self.host}:{self.port}')
+            logger.info(f'{self.app.router}')
+
 
     async def close(self):
         # Stop the aiohttp site
@@ -217,10 +220,22 @@ class HTTPSessionProtocol(Protocol):
             self.static_handlers.insert(index, handler)
 
     def find_static(self, filename:str):
-        for static_dir in self.static:
-            file_path = os.path.join(static_dir, filename)
-            if os.path.isfile(file_path):
-                return file_path
+        if '*' in filename:
+            # Handle glob pattern
+            for static_dir in self.static:
+                file_path = os.path.join(static_dir, filename)
+                matches = glob.glob(file_path)
+                if matches:
+                    if len(matches) > 1:
+                        # Return the largest file which is likely the main bundle
+                        return max(matches, key=os.path.getsize)
+                    return matches[0]
+        else:
+            # Normal exact match
+            for static_dir in self.static:
+                file_path = os.path.join(static_dir, filename)
+                if os.path.isfile(file_path):
+                    return file_path
 
         return None
 
