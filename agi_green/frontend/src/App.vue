@@ -1,6 +1,5 @@
 <template>
-  <div>
-    <Splitter style="height: 100vh;">
+    <Splitter style="height: 100vh; width: 100%;">
       <SplitterPanel size={30}>
           <Chat />
           <MDForm />
@@ -9,7 +8,6 @@
         <DocTabs class="doc-tabs"/>
       </SplitterPanel>
     </Splitter>
-  </div>
 </template>
 
 <script setup>
@@ -24,6 +22,13 @@ mermaid.initialize({ startOnLoad: false }); //, logLevel: 'debug'
 </script>
 
 <style scoped>
+.app-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .doc-tabs {
   display: flex;
   flex-direction: column;

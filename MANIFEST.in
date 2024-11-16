@@ -1,0 +1,4 @@
+recursive-include agi_green/frontend/dist *
+recursive-include agi_green/static *
+include agi_green/agi_config_default.yaml
+include agi_green/docker-compose.yml 

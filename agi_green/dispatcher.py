@@ -344,12 +344,6 @@ class Dispatcher(Protocol):
         self.stop_event = asyncio.Event()
         self.context = DictNamespace(1)
 
-        if not hasattr(Protocol, 'config'):
-            # Set the config for all protocols globally
-            Protocol.config = ConfigNamespace(
-                '$WORKSPACE/chat.agi.green/agi_config.yaml',
-                '$WORKSPACE/chat.agi.green/agi_config_default.yaml',
-                depth=2)
 
     async def run(self):
         'run the dispatcher in additive async mode (concurrent dispatchers use run()).'
