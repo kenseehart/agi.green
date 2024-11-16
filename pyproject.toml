@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agi.green"
+version = "0.1.0"
+description = "AGI.green Framework"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Ken Seehart", email = "ken@seehart.com" }
+]
+dependencies = [
+    "aiohttp",
+    "python-dotenv",
+    "openai",
+    "pyyaml",
+    "redis",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "isort",
+]
+
+[tool.setuptools]
+packages = ["agi_green"]
+include-package-data = true

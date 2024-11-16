@@ -1,0 +1,16 @@
+Collecting hatch-nodejs-version
+  Using cached hatch_nodejs_version-0.3.2-py3-none-any.whl.metadata (5.4 kB)
+Collecting hatchling>=0.21.0 (from hatch-nodejs-version)
+  Using cached hatchling-1.26.3-py3-none-any.whl.metadata (3.8 kB)
+Requirement already satisfied: packaging>=24.2 in /ws/evolver/conda_env/lib/python3.11/site-packages (from hatchling>=0.21.0->hatch-nodejs-version) (24.2)
+Collecting pathspec>=0.10.1 (from hatchling>=0.21.0->hatch-nodejs-version)
+  Using cached pathspec-0.12.1-py3-none-any.whl.metadata (21 kB)
+Requirement already satisfied: pluggy>=1.0.0 in /ws/evolver/conda_env/lib/python3.11/site-packages (from hatchling>=0.21.0->hatch-nodejs-version) (1.5.0)
+Collecting trove-classifiers (from hatchling>=0.21.0->hatch-nodejs-version)
+  Using cached trove_classifiers-2024.10.21.16-py3-none-any.whl.metadata (2.2 kB)
+Using cached hatch_nodejs_version-0.3.2-py3-none-any.whl (8.5 kB)
+Using cached hatchling-1.26.3-py3-none-any.whl (75 kB)
+Using cached pathspec-0.12.1-py3-none-any.whl (31 kB)
+Using cached trove_classifiers-2024.10.21.16-py3-none-any.whl (13 kB)
+Installing collected packages: trove-classifiers, pathspec, hatchling, hatch-nodejs-version
+Successfully installed hatch-nodejs-version-0.3.2 hatchling-1.26.3 pathspec-0.12.1 trove-classifiers-2024.10.21.16
