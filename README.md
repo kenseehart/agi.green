@@ -1,64 +1,105 @@
-# agi.green
-A user interface platform for python AI chat applications browser chat interface featuring markdown content and a unified messaging framework.
+# AGI.green Framework
 
-A high level python package controls all of the business logic, including a unified message model and asynchronous interaction with the chat ui.
+A modern Python framework for building AI-powered asynchonous chat applications with a browser interface, featuring markdown content rendering and a unified messaging system.
 
-**Please note:** *This is in somewhat early development (October 2003). The framework should be considered unstable for a few weeks.*
+Application can be built entirely in Python or can integrate with arbitrary external services.
+This differs from conventional full stack solutions with a javascript frontend application making API calls to a Python backend.
+Instead, the frontend is a slave and the backend is the application.
 
-Previous git submodule and template approach was abandoned.
-Instead the preferred strategy is to install the agi.green repo with pip.
+## Features
 
-## Dependencies:
+- **Unified Message Protocol**: Consistent message handling across different communication channels
+- **Rich Content Support**: 
+  - Markdown rendering
+  - Mermaid diagrams
+  - MathJax equations
+  - Code syntax highlighting
+- **Flexible Architecture**:
+  - WebSocket-based real-time communication
+  - AMQP integration for distributed systems
+  - Extensible protocol system
+- **AI Integration**:
+  - OpenAI API support
+  - Anthropic Claude support
+  - Custom model integration capability
+- **Asynchronous Execution**:
+  - Non limited to call and response
+  - Can add chat messages in response to arbitrary events, e.g. incoming email or SMS or task completion
+  - Can execute arbitrary code in response to a message or other events
 
-- rabbitmq: https://www.rabbitmq.com/download.html
+## Quick Start
 
-## Components:
+1. Install dependencies:
+```bash
+# Install RabbitMQ
+sudo apt-get install rabbitmq-server  # Ubuntu/Debian
+brew install rabbitmq                 # macOS
 
-- `websockets`: Communicate with browser ui
-- `aio_pika`: Communicate via `AMQP` with other docker containers
-- `markdown`: Messages are rendered as markdown (and plugins such as mermaid and mathjax)
-
-## Example chat room:
-
-This implements a peer to peer chat node. It runs inside a docker container, and broadcasts to all peers on the same docker network.
-
-It doesn't get simpler than this. `Dispatcher` hides all the details.
-
-A similar Dispatcher could implement an interface to OpenAI or other model, or various agents and API command handlers.
-
-``` python
-class ChatNode(Dispatcher):
-    '''
-    Manages the connection to RabbitMQ and WebSocket connection to browser.
-    handler methods are named on_<protocol>_<cmd> where protocol is mq or ws
-    mq = RabbitMQ
-    ws = WebSocket
-    '''
-
-    async def on_mq_chat(self, author:str, content:str):
-        'receive chat message from RabbitMQ - append to chat dialog in browser ui'
-        await self.send_ws('append_chat', content=content)
-
-    async def on_ws_chat_input(self, content:str=''):
-        'receive chat input from browser via websocket - broadcast to peers (including self)'
-        await self.send_mq('chat', author=f'{self.name}', content=content)
+# Install package
+pip install agi.green
 ```
 
-Note that `on_mq_chat` and `on_ws_chat_input` are not predefined overloaded methods. You can add any methods you like named `on_{protocol}_{command}` with arbitrary named arguments, and these handler methods will autoregister. Send messages with `send_{protocol}(command, **kwargs)` with corresponding arguments. The function signature defines the message schema. Predefined protocols are `ws` (socket connection to browser ui) and `mq` (amqp broadcast to peers, including echo to self). Protocol `gpt` coming soon. The framework provides for the definition of new protocols.
+2. Create a basic chat application:
+```python
+from agi_green.dispatcher import Dispatcher
 
-## Extensible Unified Protocol framework:
+class ChatNode(Dispatcher):
+    async def on_mq_chat(self, author: str, content: str):
+        'Receive chat message from RabbitMQ'
+        await self.send_ws('append_chat', content=content)
 
-Each protocol is a class that defines how to connect and send and receive messages.
+    async def on_ws_chat_input(self, content: str = ''):
+        'Handle chat input from browser'
+        await self.send_mq('chat', 
+            author=self.name,
+            content=content
+        )
+```
 
-- **Configurable exception handling:** By default, errors while handling messages are caught and logged so the program can continue running.
-However, sometimes you want the exception to be unhandled, such as when debugging. You can disable exception handling with `exception=None` in the constructor of the protocol or the dispatcher.
+## Protocol System
 
-## Intended applications for this framework:
+The framework uses a protocol-based architecture where each protocol handles specific types of communication:
 
-- fish: fantastic imap sorting hat (conversational email sorting)
-- yara: yet another research assistant (interactively build an up to date expert on any topic)
-- various experiments in layered language models
+- `ws`: WebSocket communication with browser
+- `mq`: RabbitMQ for peer-to-peer messaging
+- `gpt`: OpenAI API integration
+- `http`: HTTP/HTTPS server
+- Custom protocols can be added by extending the base Protocol class
 
--------------
+## Message Formatting
 
-Copyright (c) 2023 Ken Seehart, AGI Green
+Support for rich content in messages:
+```python
+# Markdown with syntax highlighting
+await self.send_ws('append_chat',
+    content='```python\nprint("Hello")\n```'
+)
+
+# Mermaid diagrams
+await self.send_ws('append_chat',
+    content='```mermaid\ngraph TD;\nA-->B;\n```'
+)
+
+# Math equations
+await self.send_ws('append_chat',
+    content=r'\\( \int x dx = \frac{x^2}{2} + C \\)'
+)
+```
+
+## Development Status
+
+Currently in active development (March 2024). The framework is being used in production but the API may have breaking changes.
+
+## Requirements
+
+- Python 3.11+
+- RabbitMQ server
+- Modern web browser
+
+## Contributing
+
+Contributions are welcome! Please check our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+## License
+
+Copyright (c) 2024 Ken Seehart, AGI Green. See [LICENSE](LICENSE) for details.

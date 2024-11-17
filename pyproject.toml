@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agi.green"
-version = "0.2.2"
+version = "0.2.3"
 description = "AGI.green Framework"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Ken Seehart", email = "ken@seehart.com" }
+    { name = "Ken Seehart", email = "ken@agi.green" }
 ]
 dependencies = [
     "aiohttp",
@@ -18,6 +18,13 @@ dependencies = [
     "openai",
     "pyyaml",
     "redis",
+    "aiofiles~=24.1.0",
+    "aio_pika",
+    "bcrypt",
+    "motor",
+    "aiosmtplib",
+    "markdown",
+    "ptvsd",
 ]
 
 [project.optional-dependencies]
