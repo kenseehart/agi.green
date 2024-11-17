@@ -15,14 +15,19 @@ export default {
         const socket = new WebSocket(ws_host);
         console.log('WebSocket created:', socket);
 
-        app.provide('send_ws', (cmd, data = {}) => {
+        const send_ws = (cmd, data = {}) => {
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ cmd, ...data }));
                 console.log('sending ws:', cmd, data);
             } else {
                 console.error('WebSocket is not open');
             }
-        });
+        };
+
+        // Provide to Vue app
+        app.provide('send_ws', send_ws);
+        // Also make available globally
+        window.send_ws = send_ws;
 
         socket.onmessage = (event) => {
             const message = JSON.parse(event.data);

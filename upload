@@ -1,0 +1,7 @@
+echo $PYPL_API
+rm -rf dist/*
+python -m build
+echo "Ready to upload. Continue? (Ctrl+C to cancel)
+read
+echo $PYPL_API
+python -m twine upload dist/*
