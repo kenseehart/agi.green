@@ -81,7 +81,7 @@ class ChatSession(Dispatcher):
     def __del__(self):
         logger.info(f'{self} deleted')
 
-    @protocol_handler
+    @protocol_handler(priority=0)
     async def on_ws_connect(self):
         'post connection node setup'
         logger.info(f'{self} connected')

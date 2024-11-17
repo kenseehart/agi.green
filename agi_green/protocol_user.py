@@ -13,7 +13,7 @@ schema:
   h2:
     type: static
     tag: h3
-    content: AGI Green Login
+    content: ARIA Login
   user:
     type: text
     label: Screen Name or Email
@@ -33,7 +33,7 @@ schema:
   h2:
     type: static
     tag: h3
-    content: AGI Green Registration
+    content: ARIA Registration
   screen_name:
     type: text
     label: Screen Name
@@ -58,7 +58,20 @@ class UserProtocol(Protocol):
     protocol_id = "user"
 
     def __init__(self, parent:Protocol):
+        self.is_authenticated = False
         super().__init__(parent)
+
+    async def create_confirmed_user(self, email: str, screen_name: str, password: str) -> str:
+        'create a new user and authenticate them'
+        result = await self.create_user(email, screen_name, password)
+        if result == 'created':
+            # Set email as confirmed
+            users_collection = get_collection("users")
+            await users_collection.update_one(
+                {"email": email}, 
+                {"$set": {"email_confirmed": True}}
+            )
+        return result   
 
     async def create_user(self, email: str, screen_name: str, password: str) -> str:
         '''create a new user, return status:
@@ -142,17 +155,33 @@ class UserProtocol(Protocol):
             success = await self.authenticate(self._confirmation_user, self._confirmation_passwd)
             del self._confirmation_passwd
 
-            if not success:
+            if success:
+                if not self.is_authenticated:
+                    self.is_authenticated = True
+                    await self.send('user', 'auth', success=True)
+
+            else:
                 await self.send('ws', 'append_chat', author='info', content=f"Automatic login failed. Please log in.\n{login_form}")
         else:
             await self.send('ws', 'append_chat', author='info', content=f"Email confirmed successfully. Please log in.\n{login_form}")
 
 
     async def authenticate(self, email_or_name: str, password: str) -> bool:
+        '''
+        authenticate user by email_or_name and password
+        return True if authenticated, False otherwise
+
+        Note that this method immediately returns True if the user is already logged in.
+        '''
         # if already logged in, return True
         if (email_or_name == self.context.user.screen_name or
             email_or_name == self.context.user.email or
             email_or_name == self.context.user.session_id):
+
+            if not self.is_authenticated:
+                self.is_authenticated = success
+                await self.send('user', 'auth', success=True)
+
             return True
 
         users_collection = get_collection("users")
@@ -189,9 +218,10 @@ class UserProtocol(Protocol):
             else:
                 user = await users_collection.find_one({"screen_name": email_or_name})
 
-                if not user['email_confirmed'] == True:
+                if user and not user['email_confirmed'] == True:
                     await self.send('ws', 'append_chat', author='info', content="Please confirm your email before logging in.")
-                    return False
+                
+                return False
 
             if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
                 success = True
@@ -211,9 +241,18 @@ class UserProtocol(Protocol):
                 await self.send('ws', 'append_chat', author='info', content="Login failed. Please check your credentials and try again.")
 
         if success:
+            if not self.is_authenticated:
+                self.is_authenticated = success
+                await self.send('user', 'auth', success=success)
+
             uc = self.context.user
+            uc.is_authenticated = True
             uc._deep_update(user)
             await self.send('ws', 'set_user_data', uid=uc.screen_name, name=uc.screen_name)
+
+        else:
+            uc = self.context.user
+            uc.is_authenticated = False
 
         return success
 
@@ -224,7 +263,13 @@ class UserProtocol(Protocol):
         #TODO: user opt-in for this feature (not on shared computers)
 
         # check if session_id is already logged in
-        await self.authenticate(self.context.session_id, "")
+        success = await self.authenticate(self.context.session_id, "")
+        if success:
+            if not self.is_authenticated:
+                self.is_authenticated = True
+                await self.send('user', 'auth', success=True)
+        else:
+            await self.send('ws', 'append_chat', author='info', content=f"Please log in.\n{login_form}")
 
     @protocol_handler
     async def on_cmd_regform(self) -> str:
@@ -289,5 +334,9 @@ class UserProtocol(Protocol):
             await self.send('ws', 'set_user_data', uid=self.context.user.screen_name, name=self.context.user.screen_name)
             await self.send('ws', 'append_chat', author='info',
                             message=f'Login successful. Welcome {self.context.user.screen_name}')
+
+            if not self.is_authenticated:
+                self.is_authenticated = True
+                await self.send('user', 'auth', success=True)
 
         return success
