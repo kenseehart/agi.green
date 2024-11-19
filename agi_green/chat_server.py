@@ -8,12 +8,14 @@ import asyncio
 
 from agi_green.dispatcher import Dispatcher, protocol_handler
 from agi_green.protocol_ws import WebSocketProtocol
-from agi_green.protocol_mq import RabbitMQProtocol
 from agi_green.protocol_cmd import CommandProtocol
 from agi_green.protocol_http import HTTPServerProtocol, HTTPSessionProtocol
 
 here = dirname(__file__)
 logger = logging.getLogger(__name__)
+
+from agi_green.protocol_mq import MQProtocol
+
 
 def get_uid(digits=12):
     'generate a unique id: random 12 digit hex'
@@ -70,7 +72,7 @@ class ChatSession(Dispatcher):
 
         self.http = HTTPSessionProtocol(self)
         self.ws = WebSocketProtocol(self)
-        self.mq = RabbitMQProtocol(self, host=rabbitmq_host)
+        self.mq = MQProtocol(self, host=rabbitmq_host)
         self.cmd = CommandProtocol(self)
 
         logger.info(f'{type(self).__name__} {self.context.user.screen_name} created: rabbitmq={rabbitmq_host}')
