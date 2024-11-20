@@ -267,17 +267,30 @@ class RabbitMQProtocol(AbstractMQProtocol):
             return
 
         full_channel_id = self.get_full_channel_id(channel_id)
-        if full_channel_id not in self.queues:
-            queue = await self.channel.declare_queue(exclusive=True)
-            await queue.bind(self.exchange, routing_key=full_channel_id)
-            self.queues[full_channel_id] = queue
-            logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
 
-            self.add_task(self.listen_to_queue(channel_id, queue))
+        # Check if a listening task already exists for this channel
+        if full_channel_id in self.queues:
+            logger.info(f'Already subscribed to {full_channel_id}, skipping duplicate task creation')
+            return
+
+        queue = await self.channel.declare_queue(exclusive=True)
+        await queue.bind(self.exchange, routing_key=full_channel_id)
+        self.queues[full_channel_id] = queue
+        logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
+        self.add_task(self.listen_to_queue(channel_id, queue))
 
     async def unsubscribe(self, channel_id: str):
         full_channel_id = self.get_full_channel_id(channel_id)
         await self.send('mq', 'unsubscribe', channel=full_channel_id, sender_id=id(self))
+
+        # Remove the queue if it exists
+        if full_channel_id in self.queues:
+            del self.queues[full_channel_id]
+
+        # remove the listening task if it exists
+        if full_channel_id in self.tasks:
+            self.tasks[full_channel_id].cancel()
+            del self.tasks[full_channel_id]
 
     async def unsubscribe_all(self):
         'unsubscribe to everything'
@@ -336,15 +349,20 @@ class InProcessMQProtocol(AbstractMQProtocol):
             return
 
         full_channel_id = self.get_full_channel_id(channel_id)
-        if full_channel_id not in self._subscribers:
-            self._subscribers[full_channel_id] = set()
-            self._message_queues[full_channel_id] = Queue()
-            
+
+        # Check if a listening task already exists for this channel
+        if full_channel_id in self._subscribers:
+            logger.info(f'Already subscribed to {full_channel_id}, skipping duplicate task creation')
+            return
+
+        self._subscribers[full_channel_id] = set()
+        self._message_queues[full_channel_id] = Queue()
+
         queue = Queue()
         self._subscribers[full_channel_id].add(queue)
         self.queues[full_channel_id] = queue
-        
-        # Start listening task
+
+        # Add listening task only if it doesn't already exist
         self.add_task(self._listen_to_queue(channel_id, queue))
 
     async def _listen_to_queue(self, channel_id: str, queue: Queue):
@@ -446,17 +464,22 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
             return
 
         full_channel_id = self.get_full_channel_id(channel_id)
-        if full_channel_id not in self.receivers:
-            receiver = self.servicebus_client.get_queue_receiver(
-                queue_name=full_channel_id,
-                max_wait_time=1  # 1 second wait time for receiving messages
-            )
-            self.receivers[full_channel_id] = receiver
-            self.queues[full_channel_id] = receiver
-            logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
-            
-            # Start listening task
-            self.add_task(self._listen_to_queue(channel_id, receiver))
+
+        # Check if a listening task already exists for this channel
+        if full_channel_id in self.receivers:
+            logger.info(f'Already subscribed to {full_channel_id}, skipping duplicate task creation')
+            return
+
+        receiver = self.servicebus_client.get_queue_receiver(
+            queue_name=full_channel_id,
+            max_wait_time=1  # 1 second wait time for receiving messages
+        )
+        self.receivers[full_channel_id] = receiver
+        self.queues[full_channel_id] = receiver
+        logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
+
+        # Add listening task only if it doesn't already exist
+        self.add_task(self._listen_to_queue(channel_id, receiver))
 
     async def _listen_to_queue(self, channel_id: str, receiver):
         async with receiver:
