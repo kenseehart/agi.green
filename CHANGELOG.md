@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5] - 2024-11-20
+
+### Added
+- Bug fix for ws connection reset - duplicate message queue
+
 ## [0.2.4] - 2024-11-19
 
 ### Added
@@ -31,5 +36,6 @@ async def on_ws_something(self, id: int, location: str):
 
 - Colorize python code blocks in markdown
 
+[0.2.5]: https://github.com/kenseehart/agi.green/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/kenseehart/agi.green/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/kenseehart/agi.green/compare/v0.2.2...v0.2.3
