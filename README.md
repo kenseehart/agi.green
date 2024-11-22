@@ -17,8 +17,8 @@ Instead, the frontend is a slave and the backend is the application.
   - YAML forms implementing [Vueform](https://vueform.com/)
 - **Flexible Architecture**:
   - WebSocket-based real-time communication
-  - AMQP integration for distributed systems
-  - Extensible protocol system
+  - Message Queue (AMQP) integration for distributed systems - rabbitmq|ABS|inprocess
+  - Extensible protocol system - asynchronous interaction with anything
 - **AI Integration**:
   - OpenAI API support
   - Anthropic Claude support
@@ -27,6 +27,13 @@ Instead, the frontend is a slave and the backend is the application.
   - Non limited to call and response
   - Can add chat messages in response to arbitrary events, e.g. incoming email or SMS or task completion
   - Can execute arbitrary code in response to a message or other events
+  - No javascript required on the frontend!
+- **Vue Forms in Markdown (chat and docs)**:
+  - Support for YAML and JSON forms in markdown
+  - Support for forms in chat messages
+  - Support for forms in documents
+  - Asynchronous form data events with no javascript required on the frontend (python only)
+  - That means no need to write any javascript to use forms!
 
 ## Quick Start
 

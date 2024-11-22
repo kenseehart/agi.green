@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.6] - 2024-11-22
+
+### Added
+- send ws message back to server on button selection changes (no submit button required)
+
+### Fixed
+- scrollbar glitch
+
 ## [0.2.5] - 2024-11-20
 
 ### Added
