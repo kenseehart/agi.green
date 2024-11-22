@@ -14,6 +14,7 @@ Instead, the frontend is a slave and the backend is the application.
   - Mermaid diagrams
   - MathJax equations
   - Code syntax highlighting
+  - YAML forms implementing [Vueform](https://vueform.com/)
 - **Flexible Architecture**:
   - WebSocket-based real-time communication
   - AMQP integration for distributed systems

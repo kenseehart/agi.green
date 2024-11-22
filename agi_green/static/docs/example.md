@@ -12,3 +12,44 @@ $$ x = {-b \pm \sqrt{b^2-4ac} \over 2a} $$
       B-->D;
       C-->D;
 ```
+
+```form-yaml
+id: login_yaml
+schema:
+  user:
+    type: text
+    label: Username
+```
+
+```form-yaml
+id: login_yaml
+schema:
+  user:
+    type: text
+    label: Username
+```
+  
+```form-json
+{
+  "id": "login_json",
+  "schema": {
+    "user": {
+      "type": "text",
+      "label": "Username"
+    }
+  }
+}
+```
+
+```form-json
+{
+  "id": "login_json",
+  "schema": {
+    "user": {
+      "type": "text",
+      "label": "Username"
+    }
+  }
+}
+```
+
