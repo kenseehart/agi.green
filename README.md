@@ -96,7 +96,7 @@ await self.send_ws('append_chat',
 
 ## Development Status
 
-Currently in active development (March 2024). The framework is being used in production but the API may have breaking changes.
+Currently in active development (March 2024). The framework is being used in production but the API may have breaking changes. See [CHANGELOG](CHANGELOG.md) for version history.
 
 ## Requirements
 
