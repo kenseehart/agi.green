@@ -4,16 +4,6 @@ channels:
   - defaults
 dependencies:
   - python=3.11
-  - aiohttp
-  - websockets
-  - openai
-  - pyyaml
-  - flask=2.3.3
-  - aiofiles
-  - pymongo
-  - pytest-asyncio
   - pip
   - pip:
-    - aio_pika==9.2.0
-    - ptvsd==4.3.2
-    - motor
+    - -e .

@@ -15,16 +15,16 @@ authors = [
 dependencies = [
     "aiohttp",
     "python-dotenv",
-    "openai",
-    "pyyaml",
+    "openai>=1.54.0,<2.0.0",
+    "pyyaml>=6.0.2",
     "redis",
     "aiofiles~=24.1.0",
-    "aio_pika",
+    "aio_pika~=9.2.0",
     "bcrypt",
     "motor",
     "aiosmtplib",
     "markdown",
-    "ptvsd",
+    "ptvsd~=4.3.2"
 ]
 
 [project.optional-dependencies]
