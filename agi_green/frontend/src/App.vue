@@ -22,26 +22,25 @@ mermaid.initialize({ startOnLoad: false }); //, logLevel: 'debug'
 </script>
 
 <style scoped>
-.app-container {
-  height: 100%;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
+:deep(.p-splitter) {
+    height: 100% !important;
+    border: none;
+    padding: 0;
+}
+
+:deep(.p-splitter-panel) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
 }
 
 .doc-tabs {
-  display: flex;
-  flex-direction: column;
-  flex: 1; /* This makes each container fill available space */
-}
-
-.p-splitter-panel {
     display: flex;
-    flex: 1; /* This makes the tab content fill available space */
     flex-direction: column;
-    min-height: 0; /* Ensures it can shrink */
-    max-height: 100%;
+    flex: 1;
+    min-height: 0;
 }
-
 </style>
 

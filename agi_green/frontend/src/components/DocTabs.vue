@@ -93,6 +93,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     min-height: 0; /* Ensures it can shrink */
     max-height: 100%;
+    padding-bottom: 35px; /* Extra padding at bottom for full scroll */
 }
 
 </style>

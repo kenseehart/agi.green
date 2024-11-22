@@ -34,7 +34,6 @@
  */
 <template>
     <div class="flex-container">
-    <ScrollPanel class="flex-grow">
         <div id="messages" class="messages">
             <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
                 <Avatar
@@ -48,14 +47,13 @@
                 <div class="chat-message" v-html="msg.content"></div>
                 </div>
             </div>
+            <div class="input-container">
+                <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
+                <button class="send-button" @click="onChatInput">
+                    <img src="@/assets/send-button.png" alt="Send" />
+                </button>
+            </div>
         </div>
-        <div class="input-container">
-            <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
-            <button class="send-button" @click="onChatInput">
-                <img src="@/assets/send-button.png" alt="Send" />
-            </button>
-        </div>
-    </ScrollPanel>
     </div>
 </template>
 
@@ -66,7 +64,6 @@ import { processMarkdown, postRender } from '@/plugins/markdownPlugin'; // Assum
 import { userData } from '@/plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '@/emitter';
 import Avatar from 'primevue/avatar';
-import ScrollPanel from 'primevue/scrollpanel';
 
 const send_ws = inject('send_ws');
 
@@ -135,10 +132,20 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.messages {
+.flex-container {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.messages {
+    flex: 1;
+    overflow-y: auto;
     padding: 5px;
+    padding-bottom: 35px;
+    display: flex;
+    flex-direction: column;
 }
 
 .chat-message-block {
@@ -167,6 +174,7 @@ onBeforeUnmount(() => {
     margin: 1rem;
     display: flex;
     align-items: center;
+    height: 80px;
 }
 
 textarea {
@@ -208,20 +216,5 @@ textarea {
     border-radius: 8px;
     word-break: break-word; /* Ensure long words don't overflow */
 }
-
-.flex-container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh; /* Adjust based on your layout needs */
-}
-
-.flex-grow {
-    flex: 1;
-    /* Ensuring ScrollPanel takes the available space */
-    width: 100%; /* Full width */
-    overflow-y: auto; /* Just in case */
-}
-
-/* Rest of the CSS stays the same, make sure the container of ScrollPanel is styled to occupy the intended space */
 </style>
 

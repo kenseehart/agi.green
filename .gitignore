@@ -46,6 +46,7 @@ ENV/
 *.swo
 
 # Distribution / packaging
+agi_green/frontend/dist/
 .Python
 build/
 develop-eggs/
