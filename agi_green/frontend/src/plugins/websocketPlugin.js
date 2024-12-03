@@ -14,13 +14,31 @@ export default {
         // Initialize WebSocket
         const socket = new WebSocket(ws_host);
         console.log('WebSocket created:', socket);
+        let reconnectTimer = null;
+        let messageQueue = [];
+
+        const connect = () => {
+            if (socket.readyState === WebSocket.CLOSED) {
+                console.log('Attempting to reconnect WebSocket...');
+                const newSocket = new WebSocket(ws_host);
+                Object.assign(socket, newSocket);
+                
+                // Reattach event handlers
+                socket.onmessage = onMessage;
+                socket.onopen = onOpen;
+                socket.onerror = onError;
+                socket.onclose = onClose;
+            }
+        };
 
         const send_ws = (cmd, data = {}) => {
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ cmd, ...data }));
                 console.log('sending ws:', cmd, data);
             } else {
-                console.error('WebSocket is not open');
+                console.log('WebSocket not open, queueing message:', cmd, data);
+                messageQueue.push({ cmd, data });
+                connect(); // Try to reconnect
             }
         };
 
@@ -29,7 +47,7 @@ export default {
         // Also make available globally
         window.send_ws = send_ws;
 
-        socket.onmessage = (event) => {
+        const onMessage = (event) => {
             const message = JSON.parse(event.data);
             const cmd = message.cmd;
             if (cmd) {
@@ -42,10 +60,43 @@ export default {
             }
         };
 
-          // Handle open, error, and close events similarly
-        socket.onopen = () => emitter.emit('ws_open');
-        socket.onerror = (error) => emitter.emit('ws_error', error);
-        socket.onclose = () => emitter.emit('ws_close');
+        const onOpen = () => {
+            console.log('WebSocket connected');
+            emitter.emit('ws_open');
+            
+            // Clear any reconnect timer
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+
+            // Send any queued messages
+            while (messageQueue.length > 0) {
+                const { cmd, data } = messageQueue.shift();
+                send_ws(cmd, data);
+            }
+        };
+
+        const onError = (error) => {
+            console.error('WebSocket error:', error);
+            emitter.emit('ws_error', error);
+        };
+
+        const onClose = () => {
+            console.log('WebSocket closed');
+            emitter.emit('ws_close');
+            
+            // Schedule reconnect if not already scheduled
+            if (!reconnectTimer) {
+                reconnectTimer = setTimeout(connect, 2000);
+            }
+        };
+
+        // Attach event handlers
+        socket.onmessage = onMessage;
+        socket.onopen = onOpen;
+        socket.onerror = onError;
+        socket.onclose = onClose;
     }
 };
 
