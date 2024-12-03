@@ -41,12 +41,16 @@ class CrewProtocol(Protocol):
         )
         
         # Load RAG database
-        docs_dir = os.path.join(os.environ.get('WORKSPACE', ''), 'chat.agi.green', 'static', 'docs')
-        try:
-            self.vectorstore = load_rag_database(docs_dir)
-            logger.info("RAG database loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load RAG database: {e}")
+        rag_data = os.environ.get('CREWAI_RAG_DATA')
+        if rag_data:
+            try:
+                self.vectorstore = load_rag_database(rag_data)
+                logger.info("RAG database loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load RAG database: {e}")
+                self.vectorstore = None
+        else:
+            logger.error("CREWAI_RAG_DATA environment variable is not set")
             self.vectorstore = None
         
         # Create ConversationalRetrievalChain
