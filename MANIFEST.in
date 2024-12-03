@@ -1,3 +1,6 @@
+include CHANGELOG.md
+include LICENSE
+include CONTRIBUTING.md
 recursive-include agi_green/frontend/dist *
 recursive-include agi_green/static *
 include agi_green/agi_config_default.yaml
