@@ -109,7 +109,7 @@ class HTTPServerProtocol(Protocol):
         await socket.prepare(request)
         session, new_session_id = self.get_or_create_session(request)
         session.ws.socket = socket
-        
+
         # Convert headers to a simple dict for message passing
         headers = {k: v for k, v in request.headers.items()}
         logger.debug(f"WebSocket connection headers: {headers}")

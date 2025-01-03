@@ -113,12 +113,17 @@ const handlers = {
         chatMessages.value.push({
             t: Date.now(),
             user: msg.author,
-            content: processMarkdown(msg.content) // Use custom markdown processing
+            content: processMarkdown(msg.content)
         });
         nextTick(() => {
-            postRender(); // Call postRender if needed for further DOM manipulations
+            postRender();
         });
     },
+    ws_set_user_data: ({ uid, name, icon }) => {
+        console.log('ws_set_user_data received:', { uid, name, icon });  // Add debug log
+        if (!uid) return;
+        userData[uid] = { name, icon };
+    }
 };
 
 onMounted(() => {

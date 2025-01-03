@@ -8,13 +8,13 @@ This module provides three implementations of the message queue protocol:
 The implementation can be selected in two ways:
 
 1. Explicitly via environment variable:
-   Set MQ_PROTOCOL to one of: 'azure', 'rabbitmq', or 'inprocess'
-   If set, the specified implementation will be used and will raise an exception if it fails.
+    Set MQ_PROTOCOL to one of: 'azure', 'rabbitmq', or 'inprocess'
+    If set, the specified implementation will be used and will raise an exception if it fails.
 
 2. Auto-detection (default when MQ_PROTOCOL is not set):
-   - First tries Azure Service Bus if AZURE_SERVICEBUS_CONNECTION_STRING is set
-   - Then tries RabbitMQ if available
-   - Falls back to InProcess implementation
+    - First tries Azure Service Bus if AZURE_SERVICEBUS_CONNECTION_STRING is set
+    - Then tries RabbitMQ if available
+    - Falls back to InProcess implementation 
 
 Required environment variables:
 - MQ_PROTOCOL (optional): Force a specific implementation ('azure'|'rabbitmq'|'inprocess')
@@ -438,8 +438,8 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
         except ServiceBusError as e:
             logger.error(f"Azure Service Bus connection failed: {e}")
             await self.send('ws', 'append_chat', 
-                          author='info', 
-                          content=f'Azure Service Bus connection failed: {e}')
+                author='info', 
+                content=f'Azure Service Bus connection failed: {e}')
 
     async def close(self):
         await self.unsubscribe_all()
@@ -561,7 +561,7 @@ def _detect_and_create_protocol():
             
         else:
             raise ValueError(f"Invalid MQ_PROTOCOL value: {forced_protocol}. "
-                           "Must be one of: 'azure', 'rabbitmq', 'inprocess'")
+                "Must be one of: 'azure', 'rabbitmq', 'inprocess'")
 
     # Auto-detection logic
     try:

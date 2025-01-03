@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.7] - 2024-12-18
+
+### Added
+- Azure user identity and photo support
+
 ## [0.2.6] - 2024-11-22
 
 ### Added

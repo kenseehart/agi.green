@@ -11,5 +11,5 @@ git push origin "v$VERSION"
 
 echo "Ready to upload agi.green $VERSION. Continue? (Ctrl+C to cancel)"
 read
-echo $PYPL_API
+echo $PYPI_TOKEN
 python -m twine upload dist/*
