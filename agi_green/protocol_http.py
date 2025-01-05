@@ -108,23 +108,28 @@ class HTTPServerProtocol(Protocol):
         socket = web.WebSocketResponse()
         await socket.prepare(request)
         session, new_session_id = self.get_or_create_session(request)
-        session.ws.socket = socket
 
         # Convert headers to a simple dict for message passing
         headers = {k: v for k, v in request.headers.items()}
         logger.debug(f"WebSocket connection headers: {headers}")
-        await session.ws.handle_mesg('connect', headers=headers)
+
+        # Pass the socket to the ws protocol's connect handler
+        ws = session.get_protocol('ws')
+        await ws.handle_mesg('connect', socket=socket, headers=headers)
 
         async for msg in socket:
             logger.info(f'ws {msg.type}, {msg.data}')
             if msg.type == WSMsgType.TEXT:
                 data = json.loads(msg.data)
                 # Handle the message
-                await session.ws.handle_mesg(**data)
+                await ws.handle_mesg(**data)
             elif msg.type == WSMsgType.ERROR:
                 logger.error('ws connection closed with exception %s' % socket.exception())
             else:
                 logger.info('ws {msg.type}')
+
+        # Handle disconnect
+        await ws.handle_mesg('disconnect', socket=socket)
 
         if new_session_id:
             logger.error(f'Unexpected new session on ws message: {self} {new_session_id}')
@@ -313,10 +318,6 @@ class HTTPSessionProtocol(Protocol):
 
         if request.method == 'GET':
             filename = request.match_info['filename'] or 'index.html'
-
-            if filename == 'index.html':
-                # since we are serving index.html, we need to reset the socket in case this is a refresh
-                self.dispatcher.get_protocol('ws').socket = None
 
             query = request.query.copy()
 

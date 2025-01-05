@@ -28,61 +28,66 @@ class WebSocketProtocol(Protocol):
 
     def __init__(self, parent:Protocol):
         super().__init__(parent)
-        self.socket:web.WebSocketResponse = None
+        self.sockets: Set[web.WebSocketResponse] = set()
         self.pre_connect_queue = []
 
-    async def ping_loop(self):
+    async def ping_loop(self, socket: web.WebSocketResponse):
         'ping the websocket to keep it alive'
-        self.last_pong_time = time.time()
+        last_pong_time = time.time()
 
-        while self.socket is not None:
+        while socket in self.sockets:
             try:
-                await self.socket.ping()
+                await socket.ping()
             except ConnectionResetError as e:
                 logger.error(f'ws connection reset (closing)')
-                self.socket = None
+                self.sockets.discard(socket)
                 break
             await asyncio.sleep(WS_PING_INTERVAL)
 
-
-    async def do_send(self, cmd:str, **kwargs):
-        'send ws message to browser via websocket'
+    async def do_send(self, cmd: str, **kwargs):
+        'send ws message to all connected browsers via websocket'
         kwargs['cmd'] = cmd
-        if self.socket is not None:
+        if self.sockets:
             try:
                 s = json.dumps(kwargs)
             except Exception as e:
                 logger.error(f'ws send error: {e})')
                 logger.error(f'ws send error: {kwargs}')
                 return
-            try:
-                await self.socket.send_str(s)
-            except Exception as e:
-                logger.error(f'ws send error: {e} (queueing message)')
-                self.socket = None
+
+            dead_sockets = set()
+            for socket in self.sockets:
+                try:
+                    await socket.send_str(s)
+                except Exception as e:
+                    logger.error(f'ws send error: {e} (removing socket)')
+                    dead_sockets.add(socket)
+
+            self.sockets -= dead_sockets
+            if not self.sockets:
                 self.pre_connect_queue.append(kwargs)
         else:
             logger.info(f'queuing ws: {format_call(cmd, kwargs)}')
             self.pre_connect_queue.append(kwargs)
 
     @protocol_handler
-    async def on_ws_connect(self):
+    async def on_ws_connect(self, socket: web.WebSocketResponse):
         'websocket connected'
         if not self.is_server:
-            assert self.socket is not None, "socket must be set"
+            self.sockets.add(socket)
 
-            while self.pre_connect_queue and self.socket is not None:
+            while self.pre_connect_queue and self.sockets:
                 kwargs = self.pre_connect_queue.pop(0)
                 await self.do_send(**kwargs)
 
-            if self.socket is None:
-                logger.error('websocket closed before queue was emptied')
+            if not self.sockets:
+                logger.error('all websockets closed before queue was emptied')
                 return
 
-            self.add_task(self.ping_loop())
+            self.add_task(self.ping_loop(socket))
 
     @protocol_handler
-    async def on_ws_disconnect(self):
+    async def on_ws_disconnect(self, socket: web.WebSocketResponse):
         'websocket disconnected'
-        self.socket = None
+        self.sockets.discard(socket)
 
