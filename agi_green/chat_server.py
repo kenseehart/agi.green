@@ -105,8 +105,7 @@ class ChatSession(Dispatcher):
     async def on_ws_disconnect(self):
         'post connection node cleanup'
         logger.info(f'{self} disconnected')
-        self.server.remove_node(self)
-        self.add_task(self.close())
+
 
     @protocol_handler
     async def on_ws_chat_input(self, content:str=''):
