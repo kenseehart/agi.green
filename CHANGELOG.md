@@ -2,10 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.7] - 2024-12-18
+## [0.3.0] - 2025-01-05
+
+### Added
+- Support multiple sockets on one session
+
+## [0.2.9] - 2025-01-03
+
+### Added
+- protocol_file to handle dynamic file changes
+- elapsed_time markdown protocol `[since|2025-01-03T12:00:00Z]` -> '1m23s'
+
+## [0.2.8] - 2024-12-18
 
 ### Added
 - Azure user identity and photo support
+
+## [0.2.7] - 2024-12-02
+
+### Fixed
+- Multiple sessions stability improvements
 
 ## [0.2.6] - 2024-11-22
 

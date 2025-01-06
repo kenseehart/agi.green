@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agi.green"
-version = "0.2.9"
+version = "0.3.0"
 description = "AGI.green Framework"
 readme = "README.md"
 requires-python = ">=3.11"
