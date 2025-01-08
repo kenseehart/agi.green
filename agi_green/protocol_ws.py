@@ -39,7 +39,7 @@ class WebSocketProtocol(Protocol):
             try:
                 await socket.ping()
             except ConnectionResetError as e:
-                logger.error(f'ws connection reset (closing)')
+                logger.error(f'ws connection reset (closing) {e} {self.dispatcher.session_id}')
                 self.sockets.discard(socket)
                 break
             await asyncio.sleep(WS_PING_INTERVAL)

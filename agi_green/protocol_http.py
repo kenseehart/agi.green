@@ -62,16 +62,18 @@ class HTTPServerProtocol(Protocol):
         raise web.HTTPMovedPermanently(https_location)
 
     def get_or_create_session(self, request):
-        session_id = request.cookies.get('SESSION_ID')
-        new_session_id = None
+        enable_session_restore = os.getenv('ENABLE_SESSION_RESTORE', '0')
+        if enable_session_restore == '1':
+            session_id = request.cookies.get('SESSION_ID')
+            new_session_id = None
+        else:
+            session_id = str(uuid.uuid4())
+            new_session_id = session_id
 
         if not session_id:
             new_session_id = session_id = str(uuid.uuid4())
 
-        try:
-            session = self.sessions[session_id]
-        except KeyError:
-            session = None
+        session = self.sessions.get(session_id)
 
         if session is None:
             session:Protocol = self.session_class(self, session_id=session_id)
@@ -92,7 +94,6 @@ class HTTPServerProtocol(Protocol):
         self.context.host = request.host
 
         if new_session_id:
-            logger.info(f'New session: {new_session_id}')
             if response is None:
                 logger.error(f'Request failed on new session {new_session_id} on http request:')
                 logger.error(f'  {request}')
@@ -111,7 +112,7 @@ class HTTPServerProtocol(Protocol):
 
         # Convert headers to a simple dict for message passing
         headers = {k: v for k, v in request.headers.items()}
-        logger.debug(f"WebSocket connection headers: {headers}")
+        logger.info(f"WebSocket connection headers: {headers}")
 
         # Pass the socket to the ws protocol's connect handler
         ws = session.get_protocol('ws')
