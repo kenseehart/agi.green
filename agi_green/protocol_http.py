@@ -362,9 +362,6 @@ class HTTPSessionProtocol(Protocol):
                 # serve the index.html file. The open_md message will populate the md viewer
                 file_path = self.find_static('index.html')
 
-                # since we are serving index.html, we need to reset the socket
-                self.dispatcher.get_protocol('ws').socket = None
-
                 # queue up the message (will be queued until after the websocket is connected)
                 await self.send('ws', 'open_md', name=filename, content=content, viewmode='render')
 
