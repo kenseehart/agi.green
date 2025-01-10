@@ -372,15 +372,19 @@ class HTTPSessionProtocol(Protocol):
 
     @staticmethod
     async def serve_file(file_path):
-            response = web.FileResponse(file_path)
+        response = web.FileResponse(file_path)
 
-            # Manually set Content-Type for .js.map files
-            if file_path.endswith('.js.map'):
-                response.content_type = 'application/json'
-            # Similarly, ensure .js files are served with the correct Content-Type
-            elif file_path.endswith('.js'):
-                response.content_type = 'application/javascript'
+        # Add cache control headers
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
 
-            print(f'{file_path} => {response.content_type}')
+        # Manually set Content-Type for .js.map files
+        if file_path.endswith('.js.map'):
+            response.content_type = 'application/json'
+        elif file_path.endswith('.js'):
+            response.content_type = 'application/javascript'
 
-            return response
+        print(f'{file_path} => {response.content_type}')
+
+        return response
