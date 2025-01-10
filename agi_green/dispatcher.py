@@ -315,6 +315,10 @@ class Protocol:
 
                     if r is not None:
                         response = r
+
+                    if response and response.pop('__break__', False):
+                        break
+
                 except self.exception as e:
                     logger.error(e, exc_info=True)
             return response

@@ -12,18 +12,19 @@ export default {
         console.log('ws_host:', ws_host);
 
         // Initialize WebSocket
-        const socket = new WebSocket(ws_host);
+        let socket = new WebSocket(ws_host);
         console.log('WebSocket created:', socket);
         let reconnectTimer = null;
         let messageQueue = [];
+        let connectionId = null;
 
         const connect = () => {
+            console.log('Connecting WebSocket, current readyState:', socket?.readyState);
             if (socket.readyState === WebSocket.CLOSED) {
                 console.log('Attempting to reconnect WebSocket...');
-                const newSocket = new WebSocket(ws_host);
-                Object.assign(socket, newSocket);
-                
-                // Reattach event handlers
+                socket = new WebSocket(ws_host);
+                console.log('New WebSocket created:', socket);
+
                 socket.onmessage = onMessage;
                 socket.onopen = onOpen;
                 socket.onerror = onError;
@@ -32,6 +33,7 @@ export default {
         };
 
         const send_ws = (cmd, data = {}) => {
+            console.log('Attempting to send:', cmd, data, 'Socket state:', socket?.readyState);
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ cmd, ...data }));
                 console.log('sending ws:', cmd, data);
@@ -48,6 +50,7 @@ export default {
         window.send_ws = send_ws;
 
         const onMessage = (event) => {
+            console.log('WebSocket message received:', event.data);
             const message = JSON.parse(event.data);
             const cmd = message.cmd;
             if (cmd) {
@@ -62,8 +65,15 @@ export default {
 
         const onOpen = () => {
             console.log('WebSocket connected');
+
+            // Get connection ID from response headers if available
+            if (socket.headers) {
+                connectionId = socket.headers['X-Connection-ID'];
+                console.log('Connection ID:', connectionId);
+            }
+
             emitter.emit('ws_open');
-            
+
             // Clear any reconnect timer
             if (reconnectTimer) {
                 clearTimeout(reconnectTimer);
@@ -85,7 +95,7 @@ export default {
         const onClose = () => {
             console.log('WebSocket closed');
             emitter.emit('ws_close');
-            
+
             // Schedule reconnect if not already scheduled
             if (!reconnectTimer) {
                 reconnectTimer = setTimeout(connect, 2000);

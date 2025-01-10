@@ -88,7 +88,11 @@ class HTTPServerProtocol(Protocol):
         logger.info(f"HTTP Request received: {request.method} {request.path}")
         session, new_session_id = self.get_or_create_session(request)
         http:HTTPSessionProtocol = session.get_protocol('http')
-        response:web.StreamResponse|None = await http.handle_request(request)
+
+        # Convert headers to a simple dict for message passing
+        headers = {k: v for k, v in request.headers.items()}
+
+        response:web.StreamResponse|None = await http.handle_request(request, headers=headers)
         self.context.host = request.host
 
         if new_session_id:
@@ -284,7 +288,7 @@ class HTTPSessionProtocol(Protocol):
             return None
         return index_file
 
-    async def handle_request(self, request:web.Request):
+    async def handle_request(self, request:web.Request, headers:dict=None):
         data = DictNamespace()
         url = str(request.url)
 
@@ -293,10 +297,23 @@ class HTTPSessionProtocol(Protocol):
 
         data.update(request.query)
 
+        # Send request to all protocols before serving static files
+        data.request_url = url
+        data.request_method = str(request.method)
+        data.headers = headers
+        response = await self.handle_mesg('request', **data)
+        if response is not None:
+            if isinstance(response, dict):
+                if response.get('__break__', False):
+                    return response.get('response')
+                return response.get('response', response)
+            return response
+
         if request.url.name and data and '.' not in request.url.name:
             # it might be a command, so try sending it to http protocol handlers
             data.request_url = url
             data.request_method = str(request.method)
+            data.headers = headers  # Add headers to data
             cmd = request.url.path[1:].replace('/', '_')
 
             response = await self.handle_mesg(cmd, **data)
@@ -313,8 +330,6 @@ class HTTPSessionProtocol(Protocol):
                 if data.request_method == 'POST':
                     logger.error(f'POST {cmd} no response (did the handler forget to return something?)')
                     return web.Response(text=f'no response to POST {cmd}', content_type='text/plain')
-
-            # otherwise, let the ordinary http processing have a go at it...
 
         if request.method == 'GET':
             filename = request.match_info['filename'] or 'index.html'

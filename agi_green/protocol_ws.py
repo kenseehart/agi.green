@@ -7,6 +7,7 @@ import json
 import asyncio
 import logging
 from os.path import exists
+import uuid
 
 from aiohttp import web
 
@@ -29,6 +30,7 @@ class WebSocketProtocol(Protocol):
     def __init__(self, parent:Protocol):
         super().__init__(parent)
         self.sockets: Set[web.WebSocketResponse] = set()
+        self.socket_states: Dict[str, Dict] = {}
         self.pre_connect_queue = []
 
     async def ping_loop(self, socket: web.WebSocketResponse):
@@ -50,6 +52,7 @@ class WebSocketProtocol(Protocol):
         if self.sockets:
             try:
                 s = json.dumps(kwargs)
+                logger.info(f'Attempting to send WebSocket message: {s}')
             except Exception as e:
                 logger.error(f'ws send error: {e})')
                 logger.error(f'ws send error: {kwargs}')
@@ -58,36 +61,69 @@ class WebSocketProtocol(Protocol):
             dead_sockets = set()
             for socket in self.sockets:
                 try:
+                    logger.info(f'Sending to socket {getattr(socket, "id", "unknown")}: {s}')
                     await socket.send_str(s)
+                    logger.info(f'Successfully sent to socket {getattr(socket, "id", "unknown")}')
                 except Exception as e:
                     logger.error(f'ws send error: {e} (removing socket)')
                     dead_sockets.add(socket)
 
             self.sockets -= dead_sockets
             if not self.sockets:
+                logger.info(f'No active sockets, queueing message: {s}')
                 self.pre_connect_queue.append(kwargs)
         else:
             logger.info(f'queuing ws: {format_call(cmd, kwargs)}')
             self.pre_connect_queue.append(kwargs)
 
-    @protocol_handler
-    async def on_ws_connect(self, socket: web.WebSocketResponse):
-        'websocket connected'
-        if not self.is_server:
+    @protocol_handler(priority=0, update=True)
+    async def on_ws_connect(self, socket: web.WebSocketResponse, headers: Dict):
+        """
+        Handle WebSocket connection with priority 0 to intercept reconnections
+        before other handlers see them
+        """
+        connection_id = headers.get('X-Connection-ID')
+
+        if connection_id and connection_id in self.socket_states:
+            logger.info(f'Reconnecting existing socket {connection_id}')
+            socket.id = connection_id
             self.sockets.add(socket)
-
-            while self.pre_connect_queue and self.sockets:
-                kwargs = self.pre_connect_queue.pop(0)
-                await self.do_send(**kwargs)
-
-            if not self.sockets:
-                logger.error('all websockets closed before queue was emptied')
-                return
-
+            state = self.socket_states[connection_id]
+            state['last_ping'] = time.time()
             self.add_task(self.ping_loop(socket))
+
+            # Prevent other handlers from seeing this as a new connection
+            return {'__break__': True}
+
+        # New connection
+        socket.id = str(uuid.uuid4())
+        logger.info(f'New socket connection {socket.id}')
+        self.sockets.add(socket)
+        self.socket_states[socket.id] = {
+            'created_at': time.time(),
+            'last_ping': time.time(),
+        }
+        self.add_task(self.ping_loop(socket))
+
+        # Process any queued messages
+        while self.pre_connect_queue:
+            await self.do_send(**self.pre_connect_queue.pop(0))
+
+        socket.headers['X-Connection-ID'] = socket.id
+        return {'socket': socket, 'headers': headers}
 
     @protocol_handler
     async def on_ws_disconnect(self, socket: web.WebSocketResponse):
-        'websocket disconnected'
         self.sockets.discard(socket)
+        # Keep state for potential reconnect
+        # Add cleanup after timeout
+        self.add_task(self._cleanup_socket_state(socket.id))
+
+    async def _cleanup_socket_state(self, socket_id: str):
+        """Remove socket state if no reconnect within timeout"""
+        await asyncio.sleep(30)  # Adjust timeout as needed
+        if socket_id in self.socket_states:
+            state = self.socket_states[socket_id]
+            if time.time() - state['last_ping'] > 30:
+                del self.socket_states[socket_id]
 
