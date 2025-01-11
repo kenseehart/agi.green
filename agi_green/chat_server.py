@@ -108,16 +108,23 @@ class ChatSession(Dispatcher):
 
 
     @protocol_handler
-    async def on_ws_chat_input(self, content:str=''):
+    async def on_ws_chat_input(self, content: str = '', socket_id: str = None):
         'receive chat input from browser via websocket'
-        # broadcast to all (including sender, which will echo back to browser)
-        #if not content.startswith('!'):
-        await self.send('mq', 'chat', channel=self.context.chat.active_channel, author=self.context.user.screen_name, content=content)
+        # Pass through socket_id for socket-specific responses
+        await self.send('mq', 'chat',
+                       channel=self.context.chat.active_channel,
+                       author=self.context.user.screen_name,
+                       content=content,
+                       socket_id=socket_id)
 
     @protocol_handler
-    async def on_mq_chat(self, channel_id:str, author:str, content:str):
+    async def on_mq_chat(self, channel_id: str, author: str, content: str, socket_id: str = None):
         'receive chat message from RabbitMQ'
-        await self.send('ws', 'append_chat', author=author, content=content)
+        # Pass through socket_id to target specific browser window
+        await self.send('ws', 'append_chat',
+                       author=author,
+                       content=content,
+                       socket_id=socket_id)
 
     @protocol_handler
     async def on_cmd_user_info(self, **kwargs):

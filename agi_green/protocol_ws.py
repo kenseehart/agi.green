@@ -46,34 +46,40 @@ class WebSocketProtocol(Protocol):
                 break
             await asyncio.sleep(WS_PING_INTERVAL)
 
-    async def do_send(self, cmd: str, **kwargs):
-        'send ws message to all connected browsers via websocket'
+    async def do_send(self, cmd: str, socket_id: str = None, **kwargs):
+        'send ws message to specific socket or all connected browsers via websocket'
         kwargs['cmd'] = cmd
-        if self.sockets:
+
+        try:
+            s = json.dumps(kwargs)
+            logger.info(f'Attempting to send WebSocket message: {s} to socket_id: {socket_id}')
+        except Exception as e:
+            logger.error(f'ws send error: {e})')
+            logger.error(f'ws send error: {kwargs}')
+            return
+
+        if not self.sockets:
+            logger.info(f'No active sockets, queueing message: {s}')
+            self.pre_connect_queue.append(kwargs)
+            return
+
+        dead_sockets = set()
+        for socket in self.sockets:
+            # Skip if socket_id specified and doesn't match
+            if socket_id and getattr(socket, 'id', None) != socket_id:
+                continue
+
             try:
-                s = json.dumps(kwargs)
-                logger.info(f'Attempting to send WebSocket message: {s}')
+                logger.info(f'Sending to socket {getattr(socket, "id", "unknown")}: {s}')
+                await socket.send_str(s)
+                logger.info(f'Successfully sent to socket {getattr(socket, "id", "unknown")}')
             except Exception as e:
-                logger.error(f'ws send error: {e})')
-                logger.error(f'ws send error: {kwargs}')
-                return
+                logger.error(f'ws send error: {e} (removing socket)')
+                dead_sockets.add(socket)
 
-            dead_sockets = set()
-            for socket in self.sockets:
-                try:
-                    logger.info(f'Sending to socket {getattr(socket, "id", "unknown")}: {s}')
-                    await socket.send_str(s)
-                    logger.info(f'Successfully sent to socket {getattr(socket, "id", "unknown")}')
-                except Exception as e:
-                    logger.error(f'ws send error: {e} (removing socket)')
-                    dead_sockets.add(socket)
-
-            self.sockets -= dead_sockets
-            if not self.sockets:
-                logger.info(f'No active sockets, queueing message: {s}')
-                self.pre_connect_queue.append(kwargs)
-        else:
-            logger.info(f'queuing ws: {format_call(cmd, kwargs)}')
+        self.sockets -= dead_sockets
+        if not self.sockets and not socket_id:  # Only queue if broadcasting
+            logger.info(f'No active sockets, queueing message: {s}')
             self.pre_connect_queue.append(kwargs)
 
     @protocol_handler(priority=0, update=True)

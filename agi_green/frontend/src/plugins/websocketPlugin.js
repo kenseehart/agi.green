@@ -35,8 +35,13 @@ export default {
         const send_ws = (cmd, data = {}) => {
             console.log('Attempting to send:', cmd, data, 'Socket state:', socket?.readyState);
             if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ cmd, ...data }));
-                console.log('sending ws:', cmd, data);
+                const messageData = {
+                    cmd,
+                    socket_id: socket.id,  // Include socket ID
+                    ...data
+                };
+                socket.send(JSON.stringify(messageData));
+                console.log('sending ws:', cmd, messageData);
             } else {
                 console.log('WebSocket not open, queueing message:', cmd, data);
                 messageQueue.push({ cmd, data });
