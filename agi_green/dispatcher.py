@@ -118,6 +118,21 @@ def protocol_handler(_func=None, *, priority=2, update=False):
     return decorator
 
 class Protocol:
+    """Base class for all protocols"""
+    protocol_id: str = ''  # Must be set by subclass
+
+    @staticmethod
+    def get_socket_channel(socket_id: str) -> str:
+        """Generate a socket-specific channel name"""
+        return f'socket.{socket_id}'
+
+    @staticmethod
+    def get_socket_id_from_channel(channel: str) -> str | None:
+        """Extract socket ID from channel name if it's a socket channel"""
+        if channel.startswith('socket.'):
+            return channel[7:]  # len('socket.') == 7
+        return None
+
     _registered_methods: Dict[str, Dict[str, Callable[..., Awaitable[None]]]]
     dispatcher: 'Dispatcher'
     protocol_id: str = ''

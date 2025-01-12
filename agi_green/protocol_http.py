@@ -112,6 +112,7 @@ class HTTPServerProtocol(Protocol):
         socket = web.WebSocketResponse()
         await socket.prepare(request)
         session, new_session_id = self.get_or_create_session(request)
+        socket.id = request.query['socket_id']
 
         # Convert headers to a simple dict for message passing
         headers = {k: v for k, v in request.headers.items()}

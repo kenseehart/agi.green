@@ -5,6 +5,7 @@ import argparse
 import random
 import logging
 import asyncio
+from aiohttp import web
 
 from agi_green.dispatcher import Dispatcher, protocol_handler
 from agi_green.protocol_ws import WebSocketProtocol
@@ -84,40 +85,55 @@ class ChatSession(Dispatcher):
         logger.info(f'{self} deleted')
 
     @protocol_handler(priority=0)
-    async def on_ws_connect(self):
+    async def on_ws_connect(self, socket: web.WebSocketResponse):
         'post connection node setup'
         logger.info(f'{self} connected')
+        socket_channel = self.get_socket_channel(socket.id)
         await self.mq.subscribe('broadcast')
-        await self.mq.subscribe('chat.public')
+        await self.mq.subscribe(socket_channel)  # Subscribe to socket-specific channel
         user_channel = f'user.{self.context.user.screen_name}'
         await self.mq.subscribe(user_channel)
         await self.mq.subscribe('session.'+self.context.session_id)
 
-        self.context.chat.active_channel = 'chat.public'
+        self.context.chat.active_channel = socket_channel  # Use socket-specific channel as active
 
         if not self.context.user.email:
             # guest user
             welcome = self.config.welcome_message
-            await self.send('mq', 'chat', channel=user_channel, author='info', content=welcome)
-
+            await self.send('mq', 'chat',
+                channel=socket_channel,
+                author='info',
+                content=welcome)
 
     @protocol_handler
-    async def on_ws_disconnect(self):
+    async def on_ws_disconnect(self, socket: web.WebSocketResponse):
         'post connection node cleanup'
         logger.info(f'{self} disconnected')
-
+        socket_channel = self.get_socket_channel(socket.id)
+        await self.mq.unsubscribe(socket_channel)
 
     @protocol_handler
-    async def on_ws_chat_input(self, content:str=''):
+    async def on_ws_chat_input(self, content:str='', socket_id:str=None):
         'receive chat input from browser via websocket'
-        # broadcast to all (including sender, which will echo back to browser)
-        #if not content.startswith('!'):
-        await self.send('mq', 'chat', channel=self.context.chat.active_channel, author=self.context.user.screen_name, content=content)
+        if socket_id is None:
+            logger.error("on_ws_chat_input received message without socket_id")
+            raise ValueError("Chat input must have a socket_id")
+
+        channel = self.get_socket_channel(socket_id)
+        await self.send('mq', 'chat',
+            channel=channel,
+            author=self.context.user.screen_name,
+            content=content)
 
     @protocol_handler
-    async def on_mq_chat(self, channel_id:str, author:str, content:str):
+    async def on_mq_chat(self, channel_id:str, author:str, content:str, **kwargs):
         'receive chat message from RabbitMQ'
-        await self.send('ws', 'append_chat', author=author, content=content)
+        # Extract socket ID from channel for routing purposes
+        socket_id = self.get_socket_id_from_channel(channel_id)
+        await self.send('ws', 'append_chat',
+                    author=author,
+                    content=content,
+                    socket_id=socket_id)  # Pass socket_id to WebSocket protocol for routing
 
     @protocol_handler
     async def on_cmd_user_info(self, **kwargs):
@@ -151,7 +167,7 @@ def main():
         ptvsd.wait_for_attach()
         logger.info(".. debugger attached")
 
-    node_class=ChatGPTSession if args.gpt else ChatSession
+    node_class = ChatSession
 
     if args.http:
         ssl_context = None

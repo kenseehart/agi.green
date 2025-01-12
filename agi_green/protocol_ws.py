@@ -46,71 +46,49 @@ class WebSocketProtocol(Protocol):
                 break
             await asyncio.sleep(WS_PING_INTERVAL)
 
-    async def do_send(self, cmd: str, **kwargs):
-        'send ws message to all connected browsers via websocket'
+    async def do_send(self, cmd: str, socket_id: str = None, **kwargs):
+        'send ws message to specific socket or all connected browsers'
         kwargs['cmd'] = cmd
-        if self.sockets:
-            try:
-                s = json.dumps(kwargs)
-                logger.info(f'Attempting to send WebSocket message: {s}')
-            except Exception as e:
-                logger.error(f'ws send error: {e})')
-                logger.error(f'ws send error: {kwargs}')
-                return
 
-            dead_sockets = set()
-            for socket in self.sockets:
-                try:
-                    logger.info(f'Sending to socket {getattr(socket, "id", "unknown")}: {s}')
-                    await socket.send_str(s)
-                    logger.info(f'Successfully sent to socket {getattr(socket, "id", "unknown")}')
-                except Exception as e:
-                    logger.error(f'ws send error: {e} (removing socket)')
-                    dead_sockets.add(socket)
-
-            self.sockets -= dead_sockets
-            if not self.sockets:
-                logger.info(f'No active sockets, queueing message: {s}')
-                self.pre_connect_queue.append(kwargs)
-        else:
+        if not self.sockets:
             logger.info(f'queuing ws: {format_call(cmd, kwargs)}')
             self.pre_connect_queue.append(kwargs)
+            return
 
-    @protocol_handler(priority=0, update=True)
-    async def on_ws_connect(self, socket: web.WebSocketResponse, headers: Dict):
-        """
-        Handle WebSocket connection with priority 0 to intercept reconnections
-        before other handlers see them
-        """
-        connection_id = headers.get('X-Connection-ID')
+        try:
+            s = json.dumps(kwargs)
+            logger.info(f'Attempting to send WebSocket message: {s}')
+        except Exception as e:
+            logger.error(f'ws send error: {e})')
+            logger.error(f'ws send error: {kwargs}')
+            return
 
-        if connection_id and connection_id in self.socket_states:
-            logger.info(f'Reconnecting existing socket {connection_id}')
-            socket.id = connection_id
-            self.sockets.add(socket)
-            state = self.socket_states[connection_id]
-            state['last_ping'] = time.time()
-            self.add_task(self.ping_loop(socket))
+        dead_sockets = set()
+        target_sockets = [s for s in self.sockets if socket_id is None or getattr(s, 'id', None) == socket_id]
 
-            # Prevent other handlers from seeing this as a new connection
-            return {'__break__': True}
+        for socket in target_sockets:
+            try:
+                logger.info(f'Sending to socket {getattr(socket, "id", "unknown")}: {s}')
+                await socket.send_str(s)
+                logger.info(f'Successfully sent to socket {getattr(socket, "id", "unknown")}')
+            except Exception as e:
+                logger.error(f'ws send error: {e} (removing socket)')
+                dead_sockets.add(socket)
 
-        # New connection
-        socket.id = str(uuid.uuid4())
-        logger.info(f'New socket connection {socket.id}')
+        self.sockets -= dead_sockets
+
+    @protocol_handler(priority=0)
+    async def on_ws_connect(self, socket: web.WebSocketResponse):
+        """Handle WebSocket connection"""
+
+        if not socket.id:
+            logger.error('No socket.id (should be set by HTTPServerProtocol.handle_websocket_request)')
+            raise ValueError('No socket.id')
+
         self.sockets.add(socket)
-        self.socket_states[socket.id] = {
-            'created_at': time.time(),
-            'last_ping': time.time(),
-        }
         self.add_task(self.ping_loop(socket))
 
-        # Process any queued messages
-        while self.pre_connect_queue:
-            await self.do_send(**self.pre_connect_queue.pop(0))
-
-        socket.headers['X-Connection-ID'] = socket.id
-        return {'socket': socket, 'headers': headers}
+        return {'socket': socket}
 
     @protocol_handler
     async def on_ws_disconnect(self, socket: web.WebSocketResponse):
@@ -126,4 +104,10 @@ class WebSocketProtocol(Protocol):
             state = self.socket_states[socket_id]
             if time.time() - state['last_ping'] > 30:
                 del self.socket_states[socket_id]
+
+    async def handle_message(self, socket: web.WebSocketResponse, data: Dict):
+        """Handle incoming WebSocket message"""
+        # Debug logging
+        logger.info(f"Received message with data: {data}")
+        await super().handle_message(socket, data)
 

@@ -11,12 +11,16 @@ export default {
 
         console.log('ws_host:', ws_host);
 
-        // Initialize WebSocket
-        let socket = new WebSocket(ws_host);
+        // Generate a unique socket ID for this connection
+        const socket_id = crypto.randomUUID();
+        console.log('Generated socket_id:', socket_id);
+
+        // Initialize WebSocket with socket_id in URL
+        const ws_url = `${ws_host}?socket_id=${socket_id}`;
+        let socket = new WebSocket(ws_url);
         console.log('WebSocket created:', socket);
         let reconnectTimer = null;
         let messageQueue = [];
-        let connectionId = null;
 
         const connect = () => {
             console.log('Connecting WebSocket, current readyState:', socket?.readyState);
@@ -35,8 +39,13 @@ export default {
         const send_ws = (cmd, data = {}) => {
             console.log('Attempting to send:', cmd, data, 'Socket state:', socket?.readyState);
             if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ cmd, ...data }));
-                console.log('sending ws:', cmd, data);
+                const message = {
+                    cmd,
+                    socket_id,  // Include socket_id in all outgoing messages
+                    ...data
+                };
+                socket.send(JSON.stringify(message));
+                console.log('sending ws:', cmd, message);
             } else {
                 console.log('WebSocket not open, queueing message:', cmd, data);
                 messageQueue.push({ cmd, data });
@@ -65,13 +74,6 @@ export default {
 
         const onOpen = () => {
             console.log('WebSocket connected');
-
-            // Get connection ID from response headers if available
-            if (socket.headers) {
-                connectionId = socket.headers['X-Connection-ID'];
-                console.log('Connection ID:', connectionId);
-            }
-
             emitter.emit('ws_open');
 
             // Clear any reconnect timer

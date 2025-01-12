@@ -4,6 +4,7 @@ static/avatars/
 **/agi_config.yaml
 **/docs/index.md
 /dist/ # ignore package dist but DO NOT ignore frontend dist (pre-built assets)
+agi_green/frontend/dist
 
 # Python
 __pycache__/
