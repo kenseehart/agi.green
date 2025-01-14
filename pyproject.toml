@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agi.green"
-version = "0.3.1"
+version = "0.3.2"
 description = "AGI.green Framework"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,7 +25,8 @@ dependencies = [
     "aiosmtplib",
     "markdown",
     "ptvsd~=4.3.2",
-    "watchdog"
+    "watchdog",
+    "tomli",
 ]
 
 [project.optional-dependencies]

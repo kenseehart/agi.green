@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-01-13
+
+- socket id channels (isolation of distinct browser pages)
+
+## [0.3.1] - 2025-01-08
+
+- minor fixes
+
 ## [0.3.0] - 2025-01-05
 
 ### Added

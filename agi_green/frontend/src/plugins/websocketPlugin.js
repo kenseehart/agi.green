@@ -26,7 +26,7 @@ export default {
             console.log('Connecting WebSocket, current readyState:', socket?.readyState);
             if (socket.readyState === WebSocket.CLOSED) {
                 console.log('Attempting to reconnect WebSocket...');
-                socket = new WebSocket(ws_host);
+                socket = new WebSocket(ws_url);
                 console.log('New WebSocket created:', socket);
 
                 socket.onmessage = onMessage;
