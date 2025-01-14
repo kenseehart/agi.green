@@ -12,6 +12,7 @@ license = { file = "LICENSE" }
 authors = [
     { name = "Ken Seehart", email = "ken@agi.green" }
 ]
+
 dependencies = [
     "aiohttp",
     "python-dotenv",
@@ -40,3 +41,4 @@ dev = [
 [tool.setuptools]
 packages = ["agi_green"]
 include-package-data = true
+package-data = { "agi_green" = ["changelog.md"] }
