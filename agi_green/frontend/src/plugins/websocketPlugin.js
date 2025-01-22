@@ -13,6 +13,8 @@ export default {
 
         // Generate a unique socket ID for this connection
         const socket_id = crypto.randomUUID();
+        // Make socket_id globally available
+        window.socket_id = socket_id;
         console.log('Generated socket_id:', socket_id);
 
         // Initialize WebSocket with socket_id in URL
@@ -21,6 +23,11 @@ export default {
         console.log('WebSocket created:', socket);
         let reconnectTimer = null;
         let messageQueue = [];
+
+        // Define handlers at module scope so they can be removed
+        let dropConfig = null;
+        let handleDragOver = null;
+        let handleDrop = null;
 
         const connect = () => {
             console.log('Connecting WebSocket, current readyState:', socket?.readyState);
@@ -109,6 +116,212 @@ export default {
         socket.onopen = onOpen;
         socket.onerror = onError;
         socket.onclose = onClose;
+
+        // Add file upload handler using FormData and fetch
+        const handleFileUpload = async (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('socket_id', socket_id);  // Include socket_id for response routing
+
+            try {
+                const response = await fetch('/upload/tax', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+
+                console.log('File uploaded successfully:', file.name);
+            } catch (error) {
+                console.error('Upload error:', error);
+            }
+        };
+
+        // Setup drop handlers for the entire window
+        window.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        window.addEventListener('drop', (e) => {
+            console.log('Drop event received:', e);
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!dropConfig) return;  // Not configured
+
+            const files = Array.from(e.dataTransfer.files);
+
+            // Filter files based on configuration
+            const validFiles = files.filter(file => {
+                // Check file type
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                if (!dropConfig.accept.includes(ext)) {
+                    send_ws('upload_error', {
+                        filename: file.name,
+                        error: `File type ${ext} not accepted`
+                    });
+                    return false;
+                }
+
+                // Check file size
+                if (file.size > dropConfig.maxSize) {
+                    send_ws('upload_error', {
+                        filename: file.name,
+                        error: `File size ${file.size} exceeds limit of ${dropConfig.maxSize}`
+                    });
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Respect multiple files setting
+            if (!dropConfig.multiple && validFiles.length > 1) {
+                send_ws('upload_error', {
+                    filename: 'multiple files',
+                    error: 'Multiple file upload not allowed'
+                });
+                return;
+            }
+
+            // Process valid files
+            validFiles.forEach(file => {
+                console.log('Valid file dropped:', file.name);
+                // Upload handling will be added in next step
+            });
+        });
+
+        const handle_ws = {
+            enable_file_drop: (data) => {
+                console.log('Enabling file drop with config:', data);
+
+                if (!data) {
+                    console.warn('No configuration provided to enable_file_drop');
+                    return;
+                }
+
+                // Remove existing listeners if they exist
+                if (handleDragOver) {
+                    window.removeEventListener('dragover', handleDragOver);
+                    window.removeEventListener('drop', handleDrop);
+                }
+
+                // Store configuration
+                dropConfig = {
+                    accept: data.accept || [],
+                    maxSize: data.max_size || Infinity,
+                    uploadUrl: data.upload_url,
+                    multiple: data.multiple || false,
+                    progressUpdates: data.progress_updates || false
+                };
+                console.log('Drop configuration set:', dropConfig);
+
+                // Define new handlers
+                handleDragOver = (e) => {
+                    console.log('Drag over event');
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+
+                handleDrop = async (e) => {
+                    console.log('Drop event received');
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (!dropConfig) {
+                        console.warn('Drop occurred but no configuration set');
+                        return;
+                    }
+
+                    const files = Array.from(e.dataTransfer.files);
+                    console.log('Files dropped:', files);
+
+                    // Validate and upload files
+                    for (const file of files) {
+                        // Check file type
+                        const ext = '.' + file.name.split('.').pop().toLowerCase();
+                        if (!dropConfig.accept.includes(ext)) {
+                            send_ws('upload_error', {
+                                filename: file.name,
+                                error: `File type ${ext} not accepted`
+                            });
+                            continue;
+                        }
+
+                        // Check file size
+                        if (file.size > dropConfig.maxSize) {
+                            send_ws('upload_error', {
+                                filename: file.name,
+                                error: `File size ${file.size} exceeds limit of ${dropConfig.maxSize}`
+                            });
+                            continue;
+                        }
+
+                        try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            formData.append('socket_id', socket_id);  // Include socket_id for response routing
+
+                            const xhr = new XMLHttpRequest();
+
+                            // Setup progress tracking
+                            if (dropConfig.progressUpdates) {
+                                xhr.upload.onprogress = (e) => {
+                                    if (e.lengthComputable) {
+                                        send_ws('upload_progress', {
+                                            filename: file.name,
+                                            bytes_sent: e.loaded,
+                                            total_bytes: e.total
+                                        });
+                                    }
+                                };
+                            }
+
+                            // Setup completion handlers
+                            xhr.onload = () => {
+                                if (xhr.status === 200) {
+                                    send_ws('upload_complete', {
+                                        filename: file.name
+                                    });
+                                } else {
+                                    send_ws('upload_error', {
+                                        filename: file.name,
+                                        error: `Upload failed: ${xhr.statusText}`
+                                    });
+                                }
+                            };
+
+                            xhr.onerror = () => {
+                                send_ws('upload_error', {
+                                    filename: file.name,
+                                    error: 'Upload failed: Network error'
+                                });
+                            };
+
+                            // Start upload
+                            console.log(`Uploading ${file.name} to ${dropConfig.uploadUrl}`);
+                            xhr.open('POST', dropConfig.uploadUrl);
+                            xhr.send(formData);
+
+                        } catch (error) {
+                            console.error('Upload error:', error);
+                            send_ws('upload_error', {
+                                filename: file.name,
+                                error: `Upload failed: ${error.message}`
+                            });
+                        }
+                    }
+                };
+
+                // Add the new listeners
+                window.addEventListener('dragover', handleDragOver);
+                window.addEventListener('drop', handleDrop);
+                console.log('Drop handlers installed');
+            },
+        };
     }
 };
 

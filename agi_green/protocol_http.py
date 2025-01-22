@@ -9,6 +9,7 @@ import glob
 import uuid
 from queue import Queue
 from os.path import exists
+from pathlib import Path
 
 from aiohttp import web, WSMsgType
 from openai import OpenAI
