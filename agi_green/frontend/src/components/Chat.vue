@@ -64,6 +64,7 @@ import { processMarkdown, postRender } from '@/plugins/markdownPlugin'; // Assum
 import { userData } from '@/plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '@/emitter';
 import Avatar from 'primevue/avatar';
+import { useFileDrop } from '@/composables/useFileDrop';
 
 const send_ws = inject('send_ws');
 
@@ -125,6 +126,7 @@ const handlers = {
         userData[uid] = { name, icon };
     }
 };
+
 
 onMounted(() => {
     bind_handlers(handlers);
