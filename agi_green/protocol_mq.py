@@ -14,7 +14,7 @@ The implementation can be selected in two ways:
 2. Auto-detection (default when MQ_PROTOCOL is not set):
     - First tries Azure Service Bus if AZURE_SERVICEBUS_CONNECTION_STRING is set
     - Then tries RabbitMQ if available
-    - Falls back to InProcess implementation 
+    - Falls back to InProcess implementation
 
 Required environment variables:
 - MQ_PROTOCOL (optional): Force a specific implementation ('azure'|'rabbitmq'|'inprocess')
@@ -25,7 +25,7 @@ Required environment variables:
 Example:
     # Auto-detect implementation:
     from agi_green.protocol_mq import MQProtocol
-    
+
     # Or force specific implementation:
     # export MQ_PROTOCOL=azure
     # export AZURE_SERVICEBUS_CONNECTION_STRING=your_connection_string
@@ -143,9 +143,9 @@ async def _test_rabbitmq_connection(host: str = None, port: int = None, raise_er
 
 class AbstractMQProtocol(Protocol, abc.ABC):
     """Abstract base class for message queue protocols"""
-    
+
     protocol_id: str = 'mq'
-    
+
     def __init__(self, parent: Protocol, host: str = None, port: int = None, **kwargs):
         super().__init__(parent)
         self.host = host
@@ -287,10 +287,7 @@ class RabbitMQProtocol(AbstractMQProtocol):
         if full_channel_id in self.queues:
             del self.queues[full_channel_id]
 
-        # remove the listening task if it exists
-        if full_channel_id in self.tasks:
-            self.tasks[full_channel_id].cancel()
-            del self.tasks[full_channel_id]
+
 
     async def unsubscribe_all(self):
         'unsubscribe to everything'
@@ -316,7 +313,7 @@ class RabbitMQProtocol(AbstractMQProtocol):
 
 class InProcessMQProtocol(AbstractMQProtocol):
     """In-process message queue implementation using Python's Queue"""
-    
+
     def __init__(self, parent: Protocol, **kwargs):
         super().__init__(parent, **kwargs)
         self._subscribers: Dict[str, Set[Queue]] = {}
@@ -327,7 +324,7 @@ class InProcessMQProtocol(AbstractMQProtocol):
     async def run(self):
         await super().run()
         self.connected = True
-        
+
         # Process any pending subscriptions
         while not self.offline_subscription_queue.empty():
             channel_id = self.offline_subscription_queue.get()
@@ -397,7 +394,7 @@ class InProcessMQProtocol(AbstractMQProtocol):
 
         kwargs['cmd'] = cmd
         full_channel = self.get_full_channel_id(channel)
-        
+
         if full_channel in self._subscribers:
             message = kwargs
             for queue in self._subscribers[full_channel]:
@@ -416,7 +413,7 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
 
     async def run(self):
         await super().run()
-        
+
         try:
             self.servicebus_client = AsyncServiceBusClient.from_connection_string(
                 conn_str=self.connection_string,
@@ -424,7 +421,7 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
             )
             self.connected = True
             logger.info('Connected to Azure Service Bus')
-            
+
             # Process pending subscriptions
             while not self.offline_subscription_queue.empty():
                 channel_id = self.offline_subscription_queue.get()
@@ -434,27 +431,27 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
             while not self.offline_queue.empty():
                 cmd, ch, kwargs = self.offline_queue.get()
                 await self.do_send(cmd, ch, **kwargs)
-                
+
         except ServiceBusError as e:
             logger.error(f"Azure Service Bus connection failed: {e}")
-            await self.send('ws', 'append_chat', 
-                author='info', 
+            await self.send('ws', 'append_chat',
+                author='info',
                 content=f'Azure Service Bus connection failed: {e}')
 
     async def close(self):
         await self.unsubscribe_all()
-        
+
         # Close all senders
         for sender in self.senders.values():
             await sender.close()
-        
+
         # Close all receivers
         for receiver in self.receivers.values():
             await receiver.close()
-            
+
         if self.servicebus_client:
             await self.servicebus_client.close()
-            
+
         self.connected = False
         await super().close()
 
@@ -499,7 +496,7 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
     async def unsubscribe(self, channel_id: str):
         full_channel_id = self.get_full_channel_id(channel_id)
         await self.do_send('unsubscribe', channel_id, sender_id=id(self))
-        
+
         if full_channel_id in self.receivers:
             receiver = self.receivers[full_channel_id]
             await receiver.close()
@@ -518,14 +515,14 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
 
         kwargs['cmd'] = cmd
         full_channel = self.get_full_channel_id(channel)
-        
+
         # Get or create sender for this channel
         if full_channel not in self.senders:
             self.senders[full_channel] = self.servicebus_client.get_queue_sender(full_channel)
-        
+
         sender = self.senders[full_channel]
         message = ServiceBusMessage(json.dumps(kwargs))
-        
+
         async with sender:
             await sender.send_messages(message)
 
@@ -549,16 +546,16 @@ def _detect_and_create_protocol():
             asyncio.run(_test_azure_connection(raise_errors=True))
             print(f"Using Azure Service Bus implementation (MQ_PROTOCOL={forced_protocol})")
             return AzureServiceBusProtocol
-            
+
         elif forced_protocol == 'rabbitmq':
             asyncio.run(_test_rabbitmq_connection(raise_errors=True))
             print(f"Using RabbitMQ implementation (MQ_PROTOCOL={forced_protocol})")
             return RabbitMQProtocol
-            
+
         elif forced_protocol == 'inprocess':
             print(f"Using InProcess MQ implementation (MQ_PROTOCOL={forced_protocol})")
             return InProcessMQProtocol
-            
+
         else:
             raise ValueError(f"Invalid MQ_PROTOCOL value: {forced_protocol}. "
                 "Must be one of: 'azure', 'rabbitmq', 'inprocess'")
