@@ -1,5 +1,9 @@
 import { emitter } from '@/emitter'; // Adjust the import path as needed
 
+function generateSimpleId() {
+    return Math.random().toString(16).substring(2, 10);
+}
+
 export default {
     install(app, options) {
         // Dynamically compute the WebSocket URL
@@ -11,8 +15,8 @@ export default {
 
         console.log('ws_host:', ws_host);
 
-        // Generate a unique socket ID for this connection
-        const socket_id = crypto.randomUUID();
+        // Simple 8-character random hex string
+        const socket_id = generateSimpleId();
         console.log('Generated socket_id:', socket_id);
 
         // Initialize WebSocket with socket_id in URL
