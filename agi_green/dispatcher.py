@@ -315,9 +315,9 @@ class Protocol:
         # call registered handler
         cmd_handlers = self.dispatcher.registered_methods[self.protocol_id][cmd]
 
+        response = None
         if cmd_handlers:
             for handler in cmd_handlers:
-                response = None
                 try:
                     r = await handler(**kwargs)
 
@@ -336,9 +336,10 @@ class Protocol:
 
                 except self.exception as e:
                     logger.error(e, exc_info=True)
-            return response
         else:
             logger.warn(f"no handler for {self.protocol_id}:{cmd}")
+
+        return response
 
     async def send(self, protocol_id, cmd:str, **kwargs):
         'send message via specified protocol'

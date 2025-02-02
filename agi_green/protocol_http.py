@@ -303,7 +303,10 @@ class HTTPSessionProtocol(Protocol):
         data.request_url = url
         data.request_method = str(request.method)
         data.headers = headers
+
+        # First try http_request handlers
         response = await self.handle_mesg('request', **data)
+
         if response is not None:
             if isinstance(response, dict):
                 if response.get('__break__', False):
@@ -384,7 +387,13 @@ class HTTPSessionProtocol(Protocol):
                 return await self.serve_file(file_path)
 
             else:
-                return await self.serve_file(file_path)
+                response = await self.serve_file(file_path)
+
+        # After getting any response, pass through http_response handler
+        if response is not None:
+            await self.handle_mesg('response', request=request, response=response, **data)
+
+        return response
 
 
     @staticmethod
