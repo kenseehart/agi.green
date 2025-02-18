@@ -146,7 +146,8 @@ class HTTPServerProtocol(Protocol):
     async def run(self):
         self.add_task(super().run())
 
-        self.app = web.Application()
+        self.app = web.Application(client_max_size=10_000_000_000)  # 10GB limit to match websocket
+        logger.info(f'web.Application(client_max_size=10_000_000_000)')
         # on_http_* methods are handled by HTTPSessionProtocol
         #handle_websocket_request
         self.app.router.add_get('/ws', self.handle_websocket_request)  # Delegate WebSocket connections
@@ -178,7 +179,7 @@ class HTTPServerProtocol(Protocol):
             await self.runner.setup()
             self.site = web.TCPSite(self.runner, self.host, self.port)
             await self.site.start()
-            logger.info(f'Serving http://{self.host}:{self.port}')
+            logger.info(f'serving http://{self.host}:{self.port}')
             logger.info(f'{self.app.router}')
 
 
