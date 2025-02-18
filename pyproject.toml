@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agi.green"
-version = "0.3.4"
+version = "0.3.5"
 description = "AGI.green Framework"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -41,4 +41,8 @@ dev = [
 [tool.setuptools]
 packages = ["agi_green"]
 include-package-data = true
-package-data = { "agi_green" = ["changelog.md"] }
+
+
+[tool.setuptools.package-data]
+"*" = ["CHANGELOG.md", "LICENSE", "CONTRIBUTING.md"]
+"agi_green" = ["CHANGELOG.md", "LICENSE", "CONTRIBUTING.md"]
