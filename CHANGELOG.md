@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.5] - 2025-02-17
+
+### Config
+- Increased max upload size to 10GB
+
+### Removed
+- Assorted cruft
+
 ## [0.3.4] - 2025-01-22
 
 ### Added
