@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.6] - 2025-02-28
+
+### Changed
+- Omit welcome message if config option `welcome_message` is None
+
 ## [0.3.5] - 2025-02-17
 
 ### Config
