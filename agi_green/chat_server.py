@@ -99,11 +99,13 @@ class ChatSession(Dispatcher):
 
         if not self.context.user.email:
             # guest user
-            welcome = self.config.welcome_message
-            await self.send('mq', 'chat',
-                channel=socket_channel,
-                author='info',
-                content=welcome)
+            welcome = self.config.get('welcome_message', None)
+            logger.info(f'Guest welcome: {welcome}')
+            if welcome and welcome.lower() != 'none':
+                await self.send('mq', 'chat',
+                    channel=socket_channel,
+                    author='info',
+                    content=welcome)
 
     @protocol_handler
     async def on_ws_disconnect(self, socket: web.WebSocketResponse):
