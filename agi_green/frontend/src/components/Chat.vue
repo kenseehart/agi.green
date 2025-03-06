@@ -50,7 +50,7 @@
             <div class="input-container">
                 <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
                 <button class="send-button" @click="onChatInput">
-                    <img src="@/assets/send-button.png" alt="Send" />
+                    <img src="@agi.green/assets/send-button.png" alt="Send" />
                 </button>
             </div>
         </div>
@@ -60,11 +60,11 @@
 
 <script setup>
 import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, inject, nextTick } from 'vue';
-import { processMarkdown, postRender } from '@/plugins/markdownPlugin'; // Assuming this is your custom processing
-import { userData } from '@/plugins/userDataPlugin';
-import { bind_handlers, unbind_handlers } from '@/emitter';
+import { processMarkdown, postRender } from '@agi.green/plugins/markdownPlugin'; // Assuming this is your custom processing
+import { userData } from '@agi.green/plugins/userDataPlugin';
+import { bind_handlers, unbind_handlers } from '@agi.green/emitter';
 import Avatar from 'primevue/avatar';
-import { useFileDrop } from '@/composables/useFileDrop';
+import { useFileDrop } from '@agi.green/composables/useFileDrop';
 
 const send_ws = inject('send_ws');
 
@@ -224,4 +224,3 @@ textarea {
     word-break: break-word; /* Ensure long words don't overflow */
 }
 </style>
-

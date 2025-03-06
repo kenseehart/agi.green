@@ -1,8 +1,19 @@
 {
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
+  "name": "agi.green",
+  "private": false,
+  "version": "0.3.6",
   "type": "module",
+  "main": "dist/agi.green.umd.js",
+  "module": "dist/agi.green.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/agi.green.es.js",
+      "require": "./dist/agi.green.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -27,5 +38,9 @@
     "@vitejs/plugin-vue": "^5.0.3",
     "tailwindcss": "^3.4.1",
     "vite": "^5.4.14"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.15",
+    "primevue": "^3.48.1"
   }
 }

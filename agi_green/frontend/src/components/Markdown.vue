@@ -25,9 +25,9 @@
 
 <script setup>
 import { ref, watch, onUpdated, nextTick } from 'vue';
-import { processMarkdown, postRender } from '@/plugins/markdownPlugin';
-import sourceIcon from '@/assets/md-source.png';
-import renderIcon from '@/assets/md-render.png';
+import { processMarkdown, postRender } from '@agi.green/plugins/markdownPlugin';
+import sourceIcon from '@agi.green/assets/md-source.png';
+import renderIcon from '@agi.green/assets/md-render.png';
 
 const props = defineProps({
     markdownContent: String,

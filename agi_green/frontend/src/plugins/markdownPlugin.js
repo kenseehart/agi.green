@@ -4,7 +4,7 @@ import python from 'highlight.js/lib/languages/python';
 import 'highlight.js/styles/github.css';
 import mermaid from 'mermaid';
 import { createApp, inject } from 'vue';
-import MDForm from '@/components/MDForm.vue'; // Update the path as necessary
+import MDForm from '@agi.green/components/MDForm.vue'; 
 import Vueform from '@vueform/vueform';
 
 // Register Python with highlight.js

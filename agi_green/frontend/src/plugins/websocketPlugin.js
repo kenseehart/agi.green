@@ -1,4 +1,4 @@
-import { emitter } from '@/emitter'; // Adjust the import path as needed
+import { emitter } from '@agi.green/emitter'
 
 function generateSimpleId() {
     return Math.random().toString(16).substring(2, 10);
@@ -328,4 +328,3 @@ export default {
         };
     }
 };
-

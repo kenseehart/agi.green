@@ -43,7 +43,9 @@ packages = ["agi_green"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-agi_green = ["CHANGELOG.md", "LICENSE", "CONTRIBUTING.md"]
-
-[tool.setuptools.data_files]
-"." = ["CHANGELOG.md", "LICENSE", "CONTRIBUTING.md"]
+agi_green = [
+    "CHANGELOG.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "frontend/dist/**/*"
+]

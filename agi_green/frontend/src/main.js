@@ -8,11 +8,14 @@ import 'primeicons/primeicons.css'; // icons
 
 import WebSocketPlugin from './plugins/websocketPlugin';
 import UserDataPlugin from './plugins/userDataPlugin';
-//import {md, escapeHtml} from './plugins/markdownPlugin';
+import markdownPlugin from './plugins/markdownPlugin';
 
 import DocTabs from './components/DocTabs.vue';
 import MarkdownView from './components/Markdown.vue';
 import Chat from './components/Chat.vue';
+import MDForm from './components/MDForm.vue';
+import GameIO from './components/GameIO.vue';
+import TwoPaneLayout from './layouts/TwoPaneLayout.vue';
 
 import PerfectScrollbar from 'vue3-perfect-scrollbar'
 import 'vue3-perfect-scrollbar/dist/vue3-perfect-scrollbar.css'
@@ -25,11 +28,41 @@ const app = createApp(App);
 app.use(PrimeVue);
 app.use(WebSocketPlugin);
 app.use(UserDataPlugin);
+app.use(markdownPlugin);
 app.use(PerfectScrollbar)
 app.use(Vueform, vueformConfig)
 
 app.component('DocTabs', DocTabs);
 app.component('MarkdownView', MarkdownView);
 app.component('Chat', Chat);
+app.component('MDForm', MDForm);
+app.component('GameIO', GameIO);
+app.component('TwoPaneLayout', TwoPaneLayout);
 app.component('Vueform', Vueform.Form);
 app.mount('#app');
+
+// Components
+export { default as Chat } from './components/Chat.vue'
+export { default as DocTabs } from './components/DocTabs.vue'
+export { default as MDForm } from './components/MDForm.vue'
+export { default as GameIO } from './components/GameIO.vue'
+
+// Layouts
+export { default as TwoPaneLayout } from './layouts/TwoPaneLayout.vue'
+
+// Plugins
+export { default as markdownPlugin } from './plugins/markdownPlugin'
+export { default as websocketPlugin } from './plugins/websocketPlugin'
+export { default as userDataPlugin } from './plugins/userDataPlugin'
+
+// Utils
+export { emitter, bind_handlers, unbind_handlers } from './emitter'
+
+// Default export for Vue plugin
+export default {
+    install(app, options) {
+        app.use(markdownPlugin)
+        app.use(websocketPlugin)
+        app.use(userDataPlugin)
+    }
+}

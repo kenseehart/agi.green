@@ -39,7 +39,7 @@
 <script setup>
 import { inject, ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 
-import { bind_handlers, unbind_handlers } from '@/emitter';
+import { bind_handlers, unbind_handlers } from '@agi.green/emitter';
 import SvgButton from './SvgButton.vue';
 
 const send_ws = inject('send_ws');

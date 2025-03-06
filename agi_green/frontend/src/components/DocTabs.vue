@@ -11,10 +11,10 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
-import { bind_handlers, unbind_handlers } from '@/emitter';
-import MarkdownView from '@/components/Markdown.vue'; // Example for direct component import
-import GameIOView from '@/components/GameIO.vue'; // Example for direct component import
-import { useFileDrop } from '@/composables/useFileDrop';
+import { bind_handlers, unbind_handlers } from '@agi.green/emitter';
+import MarkdownView from '@agi.green/components/Markdown.vue'; // Example for direct component import
+import GameIOView from '@agi.green/components/GameIO.vue'; // Example for direct component import
+import { useFileDrop } from '@agi.green/composables/useFileDrop';
 
 const componentMap = {
     'MarkdownView': MarkdownView,
@@ -101,4 +101,3 @@ onBeforeUnmount(() => {
 }
 
 </style>
-```

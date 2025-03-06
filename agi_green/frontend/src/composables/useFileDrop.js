@@ -1,5 +1,5 @@
-import { onMounted, onBeforeUnmount } from 'vue';
-import { bind_handlers, unbind_handlers } from '@/emitter';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { bind_handlers, unbind_handlers } from '@agi.green/emitter';
 
 export function useFileDrop() {
     let dropConfig = null;
