@@ -1,11 +1,23 @@
 <template>
-    <component :is="activeLayout" />
+    <component :is="activeLayout">
+        <template #left-pane>
+            <MDForm />
+        </template>
+        <template #center-pane>
+            <Chat />
+        </template>
+        <template #right-pane>
+            <DocTabs />
+        </template>
+    </component>
 </template>
 
 <script setup>
-import TwoPaneLayout from '@agi.green/layouts/TwoPaneLayout.vue';
+import TwoPaneLayout from './layouts/TwoPaneLayout.vue';
+import Chat from './components/Chat.vue';
+import MDForm from './components/MDForm.vue';
+import DocTabs from './components/DocTabs.vue';
 
-// For now, just use TwoPaneLayout directly
-// Later this can be configured by the application
+// Default to TwoPaneLayout since ThreePaneLayout will be provided by the application
 const activeLayout = TwoPaneLayout;
 </script>

@@ -25,8 +25,15 @@ export default defineConfig({
         globals: {
           vue: 'Vue',
           primevue: 'PrimeVue'
+        },
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'style.css') {
+            return 'agi.green.css';
+          }
+          return assetInfo.name;
         }
       }
-    }
+    },
+    cssCodeSplit: false
   }
 })

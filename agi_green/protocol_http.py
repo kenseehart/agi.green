@@ -215,13 +215,15 @@ class HTTPSessionProtocol(Protocol):
 
         for static_dir in self.static:
             if not exists(static_dir):
-                logger.warn(f'Static directory {static_dir}: does not exist')
-                logger.warn('Did you forget to run "npm run build" in the frontend directory?')
+                logger.warning(f'Static directory {static_dir}: does not exist')
+                logger.warning('Did you forget to run "npm run build" in the frontend directory?')
 
     def add_static(self, path:str, index:int=None):
         'add static directory'
+        logger.info(f'Adding static directory {path}')
+
         if not exists(path):
-            logger.warn(f'Static directory {path}: does not exist')
+            logger.warning(f'Static directory {path}: does not exist')
 
         if index is None:
             self.static.append(path)
@@ -399,6 +401,7 @@ class HTTPSessionProtocol(Protocol):
 
     @staticmethod
     async def serve_file(file_path):
+        logger.info(f"Serving file: {file_path}")
         response = web.FileResponse(file_path)
 
         # Add cache control headers

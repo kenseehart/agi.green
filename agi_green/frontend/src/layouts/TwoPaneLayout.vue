@@ -13,9 +13,9 @@
 <script setup>
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
-import Chat from '@agi.green/components/Chat.vue';
-import MDForm from '@agi.green/components/MDForm.vue';
-import DocTabs from '@agi.green/components/DocTabs.vue';
+import Chat from '../components/Chat.vue';
+import MDForm from '../components/MDForm.vue';
+import DocTabs from '../components/DocTabs.vue';
 
 import mermaid from 'mermaid';
 mermaid.initialize({ startOnLoad: false }); //, logLevel: 'debug'

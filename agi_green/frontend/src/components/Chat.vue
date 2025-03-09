@@ -49,8 +49,8 @@
             </div>
             <div class="input-container">
                 <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
-                <button class="send-button" @click="onChatInput">
-                    <img src="@agi.green/assets/send-button.png" alt="Send" />
+                <button class="agi-green-chat-send-button" @click="onChatInput">
+                    <img src="../assets/send-button.png" alt="Send" />
                 </button>
             </div>
         </div>
@@ -60,11 +60,11 @@
 
 <script setup>
 import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, inject, nextTick } from 'vue';
-import { processMarkdown, postRender } from '@agi.green/plugins/markdownPlugin'; // Assuming this is your custom processing
-import { userData } from '@agi.green/plugins/userDataPlugin';
-import { bind_handlers, unbind_handlers } from '@agi.green/emitter';
+import { processMarkdown, postRender } from '../plugins/markdownPlugin';
+import { userData } from '../plugins/userDataPlugin';
+import { bind_handlers, unbind_handlers } from '../emitter';
 import Avatar from 'primevue/avatar';
-import { useFileDrop } from '@agi.green/composables/useFileDrop';
+import { useFileDrop } from '../composables/useFileDrop';
 
 const send_ws = inject('send_ws');
 
@@ -121,7 +121,7 @@ const handlers = {
         });
     },
     ws_set_user_data: ({ uid, name, icon }) => {
-        console.log('ws_set_user_data received:', { uid, name, icon });  // Add debug log
+        console.log('ws_set_user_data received:', { uid, name, icon });
         if (!uid) return;
         userData[uid] = { name, icon };
     }
@@ -157,23 +157,23 @@ onBeforeUnmount(() => {
 
 .chat-message-block {
     display: flex;
-    align-items: flex-start; /* Keeps items aligned at the top */
-    width: 100%; /* Ensures block takes full container width */
+    align-items: flex-start;
+    width: 100%;
 }
 
 .avatar {
-    width: 40px; /* Set a fixed width */
-    height: 40px; /* Set a fixed height */
-    margin-right: 10px; /* Add margin between avatar and message */
-    flex-shrink: 0; /* Prevents shrinking */
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+    flex-shrink: 0;
 }
 
 .message-content {
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* Allows it to grow and fill available space */
-    flex-basis: 0; /* Start with a basis of 0 to grow from there */
-    min-width: 0; /* Prevents overflow of the container */
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
 }
 
 .input-container {
@@ -185,9 +185,9 @@ onBeforeUnmount(() => {
 }
 
 textarea {
-    width: calc(100% - 50px); /* Adjust based on the send button's width to avoid overlap */
+    width: calc(100% - 50px);
     padding: 10px;
-    padding-right: 40px; /* Increase right padding to prevent text from overlapping the send button */
+    padding-right: 40px;
     resize: vertical;
     border-radius: 4px;
     margin: 10px 0;
@@ -196,31 +196,14 @@ textarea {
     min-height: 50px;
 }
 
-.send-button {
-    position: absolute;
-    right: 10px;
-    bottom: 20px;
-    height: 30px;
-    width: 30px;
-    padding: 10;
-    border: none;
-    background: none;
-    cursor: pointer;
-}
-
-.send-button img {
-    height: 100%;
-    width: 100%;
-}
-
 .username {
     font-weight: bold;
-    margin-bottom: 5px; /* Space between the username and the message */
+    margin-bottom: 5px;
 }
 
 .chat-message {
     padding: 10px;
     border-radius: 8px;
-    word-break: break-word; /* Ensure long words don't overflow */
+    word-break: break-word;
 }
 </style>

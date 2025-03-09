@@ -176,6 +176,12 @@ function postRender() {
     }
 }
 
-
+// Add default export for Vue plugin
+export default {
+    install(app, options) {
+        app.provide('processMarkdown', processMarkdown);
+        app.provide('postRender', postRender);
+    }
+};
 
 export { processMarkdown, postRender };
