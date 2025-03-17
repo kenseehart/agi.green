@@ -50,6 +50,7 @@ export { default as DocTabs } from './components/DocTabs.vue'
 export { default as MDForm } from './components/MDForm.vue'
 export { default as GameIO } from './components/GameIO.vue'
 export { default as ResizableLayout } from './components/ResizableLayout.vue'
+export { default as MarkdownView } from './components/Markdown.vue'
 
 // Layouts
 export { default as TwoPaneLayout } from './layouts/TwoPaneLayout.vue'

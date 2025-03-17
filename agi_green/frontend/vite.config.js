@@ -12,6 +12,7 @@ export default defineConfig({
     },
   },
   build: {
+    sourcemap: true, // Enable source maps for debugging
     lib: {
       entry: path.resolve(__dirname, 'src/main.js'),
       name: 'AgiGreen',

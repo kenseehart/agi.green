@@ -1,58 +1,123 @@
 <template>
-    <div class="flex-container">
+    <div class="flex-container" :id="id">
         <div class="md-button-container">
             <button
                 @click="setViewMode('rendered')"
-                :class="{'md-button-selected': viewMode === 'rendered', 'md-button-unselected': viewMode !== 'rendered'}">
+                :class="{'md-button-selected': localViewMode === 'rendered', 'md-button-unselected': localViewMode !== 'rendered'}">
                 <img :src="renderIcon" alt="Markdown Rendered">
             </button>
             <button
                 @click="setViewMode('source')"
-                :class="{'md-button-selected': viewMode === 'source', 'md-button-unselected': viewMode !== 'source'}">
+                :class="{'md-button-selected': localViewMode === 'source', 'md-button-unselected': localViewMode !== 'source'}">
                 <img :src="sourceIcon" alt="Markdown Source">
             </button>
         </div>
-        <ScrollPanel class="flexy-scroll">
+        <div class="md-scroll-container">
             <!-- Source Content -->
-            <div v-show="viewMode === 'source'" class="md-doc">
-                <pre><code>{{ props.markdownContent }}</code></pre>
+            <div v-show="localViewMode === 'source'" class="md-doc">
+                <pre><code>{{ markdownContent }}</code></pre>
             </div>
             <!-- Rendered Markdown Content -->
-            <div v-show="viewMode === 'rendered'" class="md-doc" v-html="renderedMarkdown" ref="markdownContainer"></div>
-        </ScrollPanel>
+            <div v-show="localViewMode === 'rendered'" class="md-doc" v-html="renderedMarkdown" ref="markdownContainer"></div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, watch, onUpdated, nextTick } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { processMarkdown, postRender } from '@agi.green/plugins/markdownPlugin';
+import { bind_handlers, unbind_handlers } from '@agi.green/emitter';
+import { useFileDrop } from '@agi.green/composables/useFileDrop';
 import sourceIcon from '@agi.green/assets/md-source.png';
 import renderIcon from '@agi.green/assets/md-render.png';
 
 const props = defineProps({
-    markdownContent: String,
+    markdownContent: {
+        type: String,
+        default: ''
+    },
+    viewMode: {
+        type: String,
+        default: 'rendered'
+    },
+    id: {
+        type: String,
+        default: 'markdown-default'
+    }
 });
 
-const viewMode = ref('rendered');
+// Create internal reactive state
+const localViewMode = ref(props.viewMode);
+const markdownContent = ref(props.markdownContent);
 const renderedMarkdown = ref('');
 
-// Process markdown content initially and on content updates
+// Handle external prop changes
 watch(() => props.markdownContent, (newVal) => {
+    markdownContent.value = newVal;
+}, { immediate: true });
+
+watch(() => props.viewMode, (newVal) => {
+    localViewMode.value = newVal;
+}, { immediate: true });
+
+// Process markdown content initially and on content updates
+watch(() => markdownContent.value, (newVal) => {
     renderedMarkdown.value = processMarkdown(newVal);
     // Ensure postRender is called after markdown has been processed and DOM updated
     nextTick(() => {
-        if (viewMode.value === 'rendered') {
+        if (localViewMode.value === 'rendered') {
             postRender();
         }
     });
 }, { immediate: true });
 
 const setViewMode = (mode) => {
-    viewMode.value = mode;
+    localViewMode.value = mode;
+    if (mode === 'rendered') {
+        nextTick(() => {
+            postRender();
+        });
+    }
 };
+
+function setContent(content, mode) {
+    // Update the internal reactive state
+    markdownContent.value = content; 
+
+    // If a view mode is provided, update it
+    if (mode) {
+        localViewMode.value = mode;
+    }
+
+    // Ensure the DOM is updated and then run post-render hooks
+    nextTick(() => {
+        if (localViewMode.value === 'rendered') {
+            postRender();
+        }
+    });
+}
+
+const handlers = {
+    ws_set_md: ({ content, viewMode, id }) => {
+        // Only update if id matches or id is not provided (backwards compatibility)
+        if (!id || id === props.id) {
+            // Similar to how OpenTab affects markdown view but without tab involvement
+            setContent(content, viewMode || localViewMode.value);
+        }
+    },
+};
+
+// Add file drop functionality
+useFileDrop();
+
+onMounted(() => {
+    bind_handlers(handlers);
+});
+
+onBeforeUnmount(() => {
+    unbind_handlers(handlers);
+});
 </script>
-
-
 
 <style scoped>
 /* Add styles for your markdown viewer here */
@@ -120,9 +185,9 @@ const setViewMode = (mode) => {
     max-height: 100%;
 }
 
-.flexy-scroll {
+.md-scroll-container {
     flex: 1;
     overflow-y: auto;
+    height: 100%;
 }
-
 </style>
