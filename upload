@@ -2,14 +2,32 @@
 VERSION=$(grep 'version = ' pyproject.toml | cut -d '"' -f 2)
 
 echo $PYPL_API
+
+# Build the frontend first
+echo "Building frontend..."
+pushd agi_green/frontend
+npm run build
+popd
+
+# Clear any old Python package builds
 rm -rf dist/*
+
+# Ensure build package is installed
+pip install --upgrade build twine
+
+# Build the Python package
+echo "Building Python package..."
 python -m build
 
 # Create and push git tag
-git tag "v$VERSION"
-git push origin "v$VERSION"
+if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+  echo "Warning: Tag v$VERSION already exists"
+else
+  git tag "v$VERSION"
+  git push origin "v$VERSION"
+fi
 
 echo "Ready to upload agi.green $VERSION. Continue? (Ctrl+C to cancel)"
 read
 echo $PYPI_TOKEN
-python -m twine upload dist/*
+python -m twine upload dist/*.tar.gz dist/*.whl

@@ -9,7 +9,7 @@ Instead, the frontend is a slave and the backend is the application.
 ## Features
 
 - **Unified Message Protocol**: Consistent message handling across different communication channels
-- **Rich Content Support**: 
+- **Rich Content Support**:
   - Markdown rendering
   - Mermaid diagrams
   - MathJax equations
@@ -58,7 +58,7 @@ class ChatNode(Dispatcher):
 
     async def on_ws_chat_input(self, content: str = ''):
         'Handle chat input from browser'
-        await self.send_mq('chat', 
+        await self.send_mq('chat',
             author=self.name,
             content=content
         )
@@ -96,7 +96,7 @@ await self.send_ws('append_chat',
 
 ## Development Status
 
-Currently in active development (March 2024). The framework is being used in production but the API may have breaking changes. See [CHANGELOG](CHANGELOG.md) for version history.
+Currently in active development (March 2024). The framework is being used in production but the API may have breaking changes. See [CHANGELOG](https://github.com/kenseehart/agi.green/blob/main/CHANGELOG.md) for version history.
 
 ## Requirements
 
@@ -106,8 +106,8 @@ Currently in active development (March 2024). The framework is being used in pro
 
 ## Contributing
 
-Contributions are welcome! Please check our [Contributing Guidelines](CONTRIBUTING.md) for details.
+Contributions are welcome! Please check our [Contributing Guidelines](https://github.com/kenseehart/agi.green/blob/main/CONTRIBUTING.md) for details.
 
 ## License
 
-Copyright (c) 2024 Ken Seehart, AGI Green. See [LICENSE](LICENSE) for details.
+Copyright (c) 2024 Ken Seehart, AGI Green. See [LICENSE](https://github.com/kenseehart/agi.green/blob/main/LICENSE) for details.

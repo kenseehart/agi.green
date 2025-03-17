@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-03-17
+
+### Added
+- Support for application vite build
+- set_md command (write to named MarkdownVue component without requiring a tab)
+- better resize handling
+
+### Fixed
+- scrollbar glitch
+
 ## [0.3.6] - 2025-02-28
 
 ### Changed
@@ -96,6 +106,18 @@ async def on_ws_something(self, id: int, location: str):
 
 - Colorize python code blocks in markdown
 
+[0.4.0]: https://github.com/kenseehart/agi.green/compare/v0.3.6...v0.4.0
+[0.3.6]: https://github.com/kenseehart/agi.green/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/kenseehart/agi.green/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/kenseehart/agi.green/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/kenseehart/agi.green/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/kenseehart/agi.green/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/kenseehart/agi.green/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/kenseehart/agi.green/compare/v0.2.9...v0.3.0
+[0.2.9]: https://github.com/kenseehart/agi.green/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/kenseehart/agi.green/compare/v0.2.7...v0.2.8
+[0.2.7]: https://github.com/kenseehart/agi.green/compare/v0.2.6...v0.2.7
+[0.2.6]: https://github.com/kenseehart/agi.green/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/kenseehart/agi.green/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/kenseehart/agi.green/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/kenseehart/agi.green/compare/v0.2.2...v0.2.3
