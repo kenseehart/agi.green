@@ -16,6 +16,7 @@ import Chat from './components/Chat.vue';
 import MDForm from './components/MDForm.vue';
 import GameIO from './components/GameIO.vue';
 import TwoPaneLayout from './layouts/TwoPaneLayout.vue';
+import ResizableLayout from './components/ResizableLayout.vue';
 
 import PerfectScrollbar from 'vue3-perfect-scrollbar'
 import 'vue3-perfect-scrollbar/dist/vue3-perfect-scrollbar.css'
@@ -38,6 +39,7 @@ app.component('Chat', Chat);
 app.component('MDForm', MDForm);
 app.component('GameIO', GameIO);
 app.component('TwoPaneLayout', TwoPaneLayout);
+app.component('ResizableLayout', ResizableLayout);
 app.component('Vueform', Vueform.Form);
 app.mount('#app');
 
@@ -46,6 +48,7 @@ export { default as Chat } from './components/Chat.vue'
 export { default as DocTabs } from './components/DocTabs.vue'
 export { default as MDForm } from './components/MDForm.vue'
 export { default as GameIO } from './components/GameIO.vue'
+export { default as ResizableLayout } from './components/ResizableLayout.vue'
 
 // Layouts
 export { default as TwoPaneLayout } from './layouts/TwoPaneLayout.vue'
