@@ -134,6 +134,7 @@ const handlers = {
         });
         nextTick(() => {
             postRender();
+            scrollToBottom();
         });
     },
     ws_set_user_data: ({ uid, name, icon }) => {
@@ -143,9 +144,20 @@ const handlers = {
     }
 };
 
+// Scroll to the bottom of the chat
+const scrollToBottom = () => {
+    const messagesContainer = document.getElementById('messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+};
 
 onMounted(() => {
     bind_handlers(handlers);
+    // Initial scroll to bottom
+    nextTick(() => {
+        scrollToBottom();
+    });
 });
 
 // Cleanup event listeners to prevent memory leaks

@@ -1,3 +1,14 @@
+/**
+ * ResizableLayout CSS
+ * 
+ * This file contains base styles for the ResizableLayout component,
+ * defining the appearance of panes and splitters while providing 
+ * hooks for app-specific theming.
+ *
+ * Applications can override these styles with higher specificity selectors
+ * to change appearance without affecting resizing behavior.
+ */
+
 /* Base styles for ResizableLayout component */
 .agi-green-layout-container {
   display: flex;
@@ -14,6 +25,7 @@
   transition: none;
 }
 
+/* Splitter styling with grabbable handle */
 .agi-green-splitter {
   width: 8px;
   background-color: #404040;

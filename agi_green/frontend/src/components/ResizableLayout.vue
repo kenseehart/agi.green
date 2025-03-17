@@ -66,9 +66,6 @@ export default {
     window.addEventListener('mousemove', this.onMouseMove);
     window.addEventListener('mouseup', this.onMouseUp);
     window.addEventListener('mouseleave', this.onMouseUp);
-    
-    // Load external CSS if not already loaded
-    this.loadLayoutStyles();
   },
   beforeUnmount() {
     window.removeEventListener('mousemove', this.onMouseMove);
@@ -76,16 +73,6 @@ export default {
     window.removeEventListener('mouseleave', this.onMouseUp);
   },
   methods: {
-    loadLayoutStyles() {
-      // Check if styles are already loaded
-      if (!document.getElementById('agi-green-resizable-layout-styles')) {
-        const link = document.createElement('link');
-        link.id = 'agi-green-resizable-layout-styles';
-        link.rel = 'stylesheet';
-        link.href = '/resizable-layout.css';
-        document.head.appendChild(link);
-      }
-    },
     initializeLayout() {
       // Initialize panes from config
       this.panes = this.config.map((item, index) => ({
@@ -96,8 +83,15 @@ export default {
         maxWidth: item.maxWidth || 80
       }));
       
-      // No longer need to create splitters array as we handle them in the template
-      this.splitters = [];
+      // Validate and normalize initial widths to ensure they sum to 100%
+      const totalWidth = this.panes.reduce((sum, pane) => sum + pane.width, 0);
+      if (Math.abs(totalWidth - 100) > 0.1) {
+        // Adjust all panes proportionally
+        const factor = 100 / totalWidth;
+        this.panes.forEach(pane => {
+          pane.width = pane.width * factor;
+        });
+      }
     },
     startResize(event, splitterIndex) {
       this.isResizing = true;
@@ -125,9 +119,13 @@ export default {
       const leftPaneIndex = this.currentSplitter.leftPaneIndex;
       const rightPaneIndex = this.currentSplitter.rightPaneIndex;
       
+      // Get current widths
+      const leftWidth = this.panes[leftPaneIndex].width;
+      const rightWidth = this.panes[rightPaneIndex].width;
+      
       // Calculate new widths
-      let newLeftWidth = this.panes[leftPaneIndex].width + deltaPercentage;
-      let newRightWidth = this.panes[rightPaneIndex].width - deltaPercentage;
+      let newLeftWidth = leftWidth + deltaPercentage;
+      let newRightWidth = rightWidth - deltaPercentage;
       
       // Enforce min/max constraints
       const leftMinWidth = this.panes[leftPaneIndex].minWidth;
@@ -136,23 +134,26 @@ export default {
       const rightMaxWidth = this.panes[rightPaneIndex].maxWidth;
       
       if (newLeftWidth < leftMinWidth) {
-        const excess = leftMinWidth - newLeftWidth;
         newLeftWidth = leftMinWidth;
-        newRightWidth += excess;
+        newRightWidth = rightWidth - (newLeftWidth - leftWidth);
       } else if (newLeftWidth > leftMaxWidth) {
-        const excess = newLeftWidth - leftMaxWidth;
         newLeftWidth = leftMaxWidth;
-        newRightWidth += excess;
+        newRightWidth = rightWidth - (newLeftWidth - leftWidth);
       }
       
       if (newRightWidth < rightMinWidth) {
-        const excess = rightMinWidth - newRightWidth;
         newRightWidth = rightMinWidth;
-        newLeftWidth -= excess;
+        newLeftWidth = leftWidth + (rightWidth - newRightWidth);
       } else if (newRightWidth > rightMaxWidth) {
-        const excess = newRightWidth - rightMaxWidth;
         newRightWidth = rightMaxWidth;
-        newLeftWidth -= excess;
+        newLeftWidth = leftWidth + (rightWidth - newRightWidth);
+      }
+      
+      // Ensure total width hasn't changed
+      const widthDelta = (newLeftWidth + newRightWidth) - (leftWidth + rightWidth);
+      if (Math.abs(widthDelta) > 0.01) {
+        // Adjust to maintain total width
+        newRightWidth = rightWidth + (leftWidth - newLeftWidth);
       }
       
       // Update pane widths
