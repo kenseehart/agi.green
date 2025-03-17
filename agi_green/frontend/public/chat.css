@@ -11,6 +11,15 @@
     cursor: pointer;
 }
 
+.agi-green-chat-input-container {
+    position: relative;
+    margin: 1rem;
+    display: flex;
+    align-items: flex-start;
+    height: auto;
+    min-height: 50px;
+}
+
 .agi-green-chat-send-button img {
     width: 100%;
     height: 100%;

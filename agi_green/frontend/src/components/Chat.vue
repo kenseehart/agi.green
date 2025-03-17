@@ -33,21 +33,21 @@
  * <Chat />
  */
 <template>
-    <div class="flex-container">
-        <div id="messages" class="messages">
-            <div v-for="msg in chatMessages" :key="msg.id" class="chat-message-block">
+    <div class="agi-green-flex-container">
+        <div id="messages" class="agi-green-messages">
+            <div v-for="msg in chatMessages" :key="msg.id" class="agi-green-chat-message-block">
                 <Avatar
                     :image="getUserIcon(msg.user)"
                     :alt="`${getUser(msg.user).name}'s avatar`"
                     :title="getUser(msg.user).name"
                     shape="circle"
                 />
-                <div class="message-content">
-                <div class="username">{{ getUser(msg.user).name }}</div>
-                <div class="chat-message" v-html="msg.content"></div>
+                <div class="agi-green-message-content">
+                <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
+                <div class="agi-green-chat-message" v-html="msg.content"></div>
                 </div>
             </div>
-            <div class="input-container">
+            <div class="agi-green-chat-input-container">
                 <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
                 <button class="agi-green-chat-send-button" @click="onChatInput">
                     <img src="../assets/send-button.png" alt="Send" />
@@ -72,8 +72,24 @@ const chatMessages = ref([]);
 const message = ref('');
 
 const autoResize = (event) => {
+    // Store the original scroll position
+    const messagesContainer = document.getElementById('messages');
+    const scrollTop = messagesContainer ? messagesContainer.scrollTop : 0;
+    
+    // Get the original height for comparison
+    const originalHeight = event.target.style.height;
+    
+    // Reset height to properly calculate the new scrollHeight
     event.target.style.height = 'auto';
-    event.target.style.height = event.target.scrollHeight + 5 + 'px';
+    
+    // Set new height based on content
+    const newHeight = event.target.scrollHeight + 5 + 'px';
+    event.target.style.height = newHeight;
+    
+    // If this is an expansion (not first load or shrinking), maintain the scroll position
+    if (messagesContainer && originalHeight && parseInt(newHeight) > parseInt(originalHeight)) {
+        messagesContainer.scrollTop = scrollTop;
+    }
 };
 
 const onEnterPress = (event) => {
@@ -139,26 +155,18 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.flex-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: hidden;
-}
-
-.messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 5px;
-    padding-bottom: 35px;
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-message-block {
-    display: flex;
-    align-items: flex-start;
-    width: 100%;
+textarea {
+    width: calc(100% - 50px);
+    padding: 10px;
+    padding-right: 40px;
+    resize: vertical;
+    border-radius: 4px;
+    margin: 10px 0 0 0;
+    box-sizing: border-box;
+    flex-grow: 1;
+    min-height: 50px;
+    position: relative;
+    top: 0;
 }
 
 .avatar {
@@ -166,44 +174,5 @@ onBeforeUnmount(() => {
     height: 40px;
     margin-right: 10px;
     flex-shrink: 0;
-}
-
-.message-content {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-    flex-basis: 0;
-    min-width: 0;
-}
-
-.input-container {
-    position: relative;
-    margin: 1rem;
-    display: flex;
-    align-items: center;
-    height: 80px;
-}
-
-textarea {
-    width: calc(100% - 50px);
-    padding: 10px;
-    padding-right: 40px;
-    resize: vertical;
-    border-radius: 4px;
-    margin: 10px 0;
-    box-sizing: border-box;
-    flex-grow: 1;
-    min-height: 50px;
-}
-
-.username {
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.chat-message {
-    padding: 10px;
-    border-radius: 8px;
-    word-break: break-word;
 }
 </style>
