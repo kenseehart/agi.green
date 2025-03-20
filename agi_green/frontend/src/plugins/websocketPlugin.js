@@ -6,6 +6,15 @@ function generateSimpleId() {
 
 export default {
     install(app, options) {
+        // Check if the plugin has already been installed
+        if (window.AGI_GREEN_WEBSOCKET_INSTALLED) {
+            console.log('websocketPlugin already installed, using existing WebSocket');
+            return;
+        }
+        
+        // Mark the plugin as installed
+        window.AGI_GREEN_WEBSOCKET_INSTALLED = true;
+        
         // Dynamically compute the WebSocket URL
         const protocol = window.location.protocol;
         const host = window.location.hostname;
