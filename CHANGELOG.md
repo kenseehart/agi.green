@@ -5,8 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.4.1] - 2025-03-20
 
 ### Fixed
-- Duplicate websocket connection
-- Duplicate file drop and upload
+- Duplicate websocket connection on loading
 
 ## [0.4.0] - 2025-03-17
 
