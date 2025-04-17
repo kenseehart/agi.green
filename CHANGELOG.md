@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-03-22
+
+### Fixed
+- Use cloudflare polyfill
+- Fixed duplicate websocket connection on loading (regression in 0.4.1)
+
 ## [0.4.1] - 2025-03-20
 
 ### Fixed
