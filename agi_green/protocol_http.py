@@ -238,10 +238,12 @@ class HTTPSessionProtocol(Protocol):
             self.static_handlers.insert(index, handler)
 
     def find_static(self, filename:str):
+        logger.info(f"Looking for static file: {filename}")
         if '*' in filename:
             # Handle glob pattern
             for static_dir in self.static:
                 file_path = os.path.join(static_dir, filename)
+                logger.info(f"Checking glob path: {file_path}")
                 matches = glob.glob(file_path)
                 if matches:
                     if len(matches) > 1:
@@ -252,9 +254,12 @@ class HTTPSessionProtocol(Protocol):
             # Normal exact match
             for static_dir in self.static:
                 file_path = os.path.join(static_dir, filename)
-                if os.path.isfile(file_path):
+                exists = os.path.isfile(file_path)
+                logger.info(f"Checking path: {file_path}, exists: {exists}")
+                if exists:
                     return file_path
 
+        logger.warning(f"Static file not found: {filename}")
         return None
 
     def find_static_glob(self, filename:str):
@@ -339,7 +344,7 @@ class HTTPSessionProtocol(Protocol):
                     logger.error(f'POST {cmd} no response (did the handler forget to return something?)')
                     return web.Response(text=f'no response to POST {cmd}', content_type='text/plain')
 
-        if request.method == 'GET':
+        if request.method in ['GET', 'HEAD']:
             filename = request.match_info['filename'] or 'index.html'
 
             query = request.query.copy()
@@ -395,6 +400,11 @@ class HTTPSessionProtocol(Protocol):
         # After getting any response, pass through http_response handler
         if response is not None:
             await self.handle_mesg('response', request=request, response=response, **data)
+
+        # Ensure we never return None which would cause AttributeError
+        if response is None:
+            logger.error(f"No response generated for request: {request.method} {request.path}. Returning 404.")
+            response = web.HTTPNotFound(text="Resource not found")
 
         return response
 

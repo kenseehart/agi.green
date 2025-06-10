@@ -1,6 +1,9 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## [0.4.3] - 2025-06-10
+
+### Fixed
+- mq protocol handler should use non-blocking queue operations
 
 ## [0.4.2] - 2025-03-22
 
