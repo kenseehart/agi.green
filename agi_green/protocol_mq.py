@@ -37,7 +37,7 @@ from typing import Callable, Awaitable, Dict, Any, List, Set, Union, Tuple
 from logging import getLogger, Logger
 import json
 import logging
-from queue import Queue
+from queue import Queue, Empty
 from os.path import exists
 import asyncio
 import abc
@@ -205,6 +205,8 @@ class RabbitMQProtocol(AbstractMQProtocol):
         self.channel: aio_pika.Channel = None
         self.exchange: aio_pika.Exchange = None
         # Note: queues, offline_queue, and offline_subscription_queue are now inherited
+        # Track listening tasks per channel for proper cleanup
+        self._listening_tasks: Dict[str, asyncio.Task] = {}
 
     async def run(self):
         await super().run()
@@ -247,19 +249,23 @@ class RabbitMQProtocol(AbstractMQProtocol):
         await super().close()
 
     async def listen_to_queue(self, channel_id, queue):
-        async with queue.iterator() as queue_iter:
-            async for message in queue_iter:
-                async with message.process():
-                    data = json.loads(message.body.decode())
-                    if data['cmd'] == 'unsubscribe':
-                        if data['sender_id'] == id(self):
-                            break
-                    else:
-                       await self.handle_mesg(channel_id=channel_id, **data)
-
         full_channel_id = self.get_full_channel_id(channel_id)
-        del self.queues[full_channel_id]
-        logger.info(f'{self.dispatcher.context.user.screen_name} unsubscribed from {full_channel_id}')
+        try:
+            async with queue.iterator() as queue_iter:
+                async for message in queue_iter:
+                    async with message.process():
+                        data = json.loads(message.body.decode())
+                        if data['cmd'] == 'unsubscribe':
+                            if data['sender_id'] == id(self):
+                                break
+                        else:
+                           await self.handle_mesg(channel_id=channel_id, **data)
+        finally:
+            # Clean up data structures and task tracking
+            if full_channel_id in self.queues:
+                del self.queues[full_channel_id]
+            self._listening_tasks.pop(full_channel_id, None)
+            logger.info(f'{self.dispatcher.context.user.screen_name} unsubscribed from {full_channel_id}')
 
     async def subscribe(self, channel_id: str):
         if not self.connected:
@@ -277,10 +283,29 @@ class RabbitMQProtocol(AbstractMQProtocol):
         await queue.bind(self.exchange, routing_key=full_channel_id)
         self.queues[full_channel_id] = queue
         logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
-        self.add_task(self.listen_to_queue(channel_id, queue))
+
+        # Create and track listening task for proper cleanup
+        task = asyncio.create_task(self.listen_to_queue(channel_id, queue))
+        self._listening_tasks[full_channel_id] = task
+        self.running_tasks.append(task)
+        task.add_done_callback(self.running_tasks.remove)
 
     async def unsubscribe(self, channel_id: str):
         full_channel_id = self.get_full_channel_id(channel_id)
+
+        # Cancel the listening task first to stop the infinite loop
+        if full_channel_id in self._listening_tasks:
+            task = self._listening_tasks[full_channel_id]
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            # Remove from tracking (may already be removed by finally block)
+            self._listening_tasks.pop(full_channel_id, None)
+
+        # Send unsubscribe message
         await self.send('mq', 'unsubscribe', channel=full_channel_id, sender_id=id(self))
 
         # Remove the queue if it exists
@@ -320,6 +345,8 @@ class InProcessMQProtocol(AbstractMQProtocol):
         self._message_queues: Dict[str, Queue] = {}
         # Get the event loop from asyncio instead of dispatcher
         self._loop = asyncio.get_event_loop()
+        # Track listening tasks per channel for proper cleanup
+        self._listening_tasks: Dict[str, asyncio.Task] = {}
 
     async def run(self):
         await super().run()
@@ -359,28 +386,66 @@ class InProcessMQProtocol(AbstractMQProtocol):
         self._subscribers[full_channel_id].add(queue)
         self.queues[full_channel_id] = queue
 
-        # Add listening task only if it doesn't already exist
-        self.add_task(self._listen_to_queue(channel_id, queue))
+        # Create and track listening task for cleanup
+        task = asyncio.create_task(self._listen_to_queue(channel_id, queue))
+        self._listening_tasks[full_channel_id] = task
+        self.running_tasks.append(task)
+        task.add_done_callback(self.running_tasks.remove)
 
     async def _listen_to_queue(self, channel_id: str, queue: Queue):
-        while True:
-            try:
-                # Use our stored loop reference instead of dispatcher.loop
-                data = await self._loop.run_in_executor(None, queue.get)
-                if data.get('cmd') == 'unsubscribe' and data.get('sender_id') == id(self):
+        full_channel_id = self.get_full_channel_id(channel_id)
+        try:
+            while True:
+                try:
+                    # Use non-blocking approach with timeout to allow cancellation
+                    data = None
+                    try:
+                        data = queue.get(block=False)  # Non-blocking get
+                    except Empty:
+                        # Queue is empty, wait a bit and check for cancellation
+                        await asyncio.sleep(0.1)
+                        continue
+
+                    if data.get('cmd') == 'unsubscribe' and data.get('sender_id') == id(self):
+                        break
+                    await self.handle_mesg(channel_id=channel_id, **data)
+                except asyncio.CancelledError:
+                    # Task was cancelled, exit gracefully
                     break
-                await self.handle_mesg(channel_id=channel_id, **data)
-            except Exception as e:
-                logger.error(f"Error processing message: {e}")
-                break
+                except Exception as e:
+                    logger.error(f"Error processing message: {e}")
+                    break
+        finally:
+            # Clean up task tracking when the listener exits
+            if full_channel_id in self._listening_tasks:
+                self._listening_tasks.pop(full_channel_id, None)
+            logger.debug(f"Listening task for {full_channel_id} terminated")
 
     async def unsubscribe(self, channel_id: str):
         full_channel_id = self.get_full_channel_id(channel_id)
+
+        # Cancel the listening task first to stop the infinite loop
+        if full_channel_id in self._listening_tasks:
+            task = self._listening_tasks[full_channel_id]
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            # Remove from tracking (may already be removed by finally block)
+            self._listening_tasks.pop(full_channel_id, None)
+
+        # Send unsubscribe message
         await self.do_send('unsubscribe', channel_id, sender_id=id(self))
+
+        # Clean up data structures
         if full_channel_id in self._subscribers:
             del self._subscribers[full_channel_id]
         if full_channel_id in self._message_queues:
             del self._message_queues[full_channel_id]
+        if full_channel_id in self.queues:
+            del self.queues[full_channel_id]
 
     async def unsubscribe_all(self):
         for full_channel_id in list(self._subscribers.keys()):
@@ -410,6 +475,8 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
         self.servicebus_client: AsyncServiceBusClient = None
         self.senders: Dict[str, Any] = {}
         self.receivers: Dict[str, Any] = {}
+        # Track listening tasks per channel for proper cleanup
+        self._listening_tasks: Dict[str, asyncio.Task] = {}
 
     async def run(self):
         await super().run()
@@ -475,28 +542,52 @@ class AzureServiceBusProtocol(AbstractMQProtocol):
         self.queues[full_channel_id] = receiver
         logger.info(f'{self.dispatcher.context.user.screen_name} subscribed to {full_channel_id}')
 
-        # Add listening task only if it doesn't already exist
-        self.add_task(self._listen_to_queue(channel_id, receiver))
+        # Create and track listening task for proper cleanup
+        task = asyncio.create_task(self._listen_to_queue(channel_id, receiver))
+        self._listening_tasks[full_channel_id] = task
+        self.running_tasks.append(task)
+        task.add_done_callback(self.running_tasks.remove)
 
     async def _listen_to_queue(self, channel_id: str, receiver):
-        async with receiver:
-            while True:
-                try:
-                    messages = await receiver.receive_messages(max_message_count=10, max_wait_time=1)
-                    for message in messages:
-                        async with message:
-                            data = json.loads(str(message))
-                            if data.get('cmd') == 'unsubscribe' and data.get('sender_id') == id(self):
-                                return
-                            await self.handle_mesg(channel_id=channel_id, **data)
-                except Exception as e:
-                    logger.error(f"Error processing Azure Service Bus message: {e}")
-                    break
+        full_channel_id = self.get_full_channel_id(channel_id)
+        try:
+            async with receiver:
+                while True:
+                    try:
+                        messages = await receiver.receive_messages(max_message_count=10, max_wait_time=1)
+                        for message in messages:
+                            async with message:
+                                data = json.loads(str(message))
+                                if data.get('cmd') == 'unsubscribe' and data.get('sender_id') == id(self):
+                                    return
+                                await self.handle_mesg(channel_id=channel_id, **data)
+                    except Exception as e:
+                        logger.error(f"Error processing Azure Service Bus message: {e}")
+                        break
+        finally:
+            # Clean up task tracking when the listener exits
+            self._listening_tasks.pop(full_channel_id, None)
+            logger.debug(f"Azure Service Bus listening task for {full_channel_id} terminated")
 
     async def unsubscribe(self, channel_id: str):
         full_channel_id = self.get_full_channel_id(channel_id)
+
+        # Cancel the listening task first to stop the infinite loop
+        if full_channel_id in self._listening_tasks:
+            task = self._listening_tasks[full_channel_id]
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            # Remove from tracking (may already be removed by finally block)
+            self._listening_tasks.pop(full_channel_id, None)
+
+        # Send unsubscribe message
         await self.do_send('unsubscribe', channel_id, sender_id=id(self))
 
+        # Clean up data structures
         if full_channel_id in self.receivers:
             receiver = self.receivers[full_channel_id]
             await receiver.close()
