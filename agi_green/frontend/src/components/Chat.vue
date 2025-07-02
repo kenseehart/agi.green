@@ -47,12 +47,29 @@
                 <div class="agi-green-chat-message" v-html="msg.content"></div>
                 </div>
             </div>
-            <div class="agi-green-chat-input-container">
-                <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
-                <button class="agi-green-chat-send-button" @click="onChatInput">
-                    <img src="../assets/send-button.png" alt="Send" />
-                </button>
+
+            <!-- Tax Progress Bar -->
+            <div v-if="showTaxProgress" class="agi-green-chat-message-block">
+                <Avatar
+                    :image="getUserIcon('Aria')"
+                    :alt="'Aria\'s avatar'"
+                    :title="'Aria'"
+                    shape="circle"
+                />
+                <div class="agi-green-message-content">
+                <div class="agi-green-username">Aria</div>
+                <div class="agi-green-chat-message">
+                    <TaxProgressBar
+                        :status="taxProgressStatus"
+                        :current-step="taxProgressStep"
+                        :total-steps="5"
+                        :status-text="taxProgressText"
+                    />
+                </div>
+                </div>
             </div>
+
+            <ChatInput v-model="message" @input="autoResize" @send="onChatInput" @file="handleFileUpload" />
         </div>
     </div>
 </template>
@@ -64,6 +81,8 @@ import { processMarkdown, postRender } from '../plugins/markdownPlugin';
 import { userData } from '../plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '../emitter';
 import Avatar from 'primevue/avatar';
+import ChatInput from './ChatInput.vue';
+import TaxProgressBar from './TaxProgressBar.vue';
 import { useFileDrop } from '../composables/useFileDrop';
 
 const send_ws = inject('send_ws');
@@ -71,32 +90,30 @@ const send_ws = inject('send_ws');
 const chatMessages = ref([]);
 const message = ref('');
 
+// Tax progress tracking
+const showTaxProgress = ref(false);
+const taxProgressStatus = ref('idle');
+const taxProgressStep = ref(0);
+const taxProgressText = ref('Ready to process');
+
 const autoResize = (event) => {
     // Store the original scroll position
     const messagesContainer = document.getElementById('messages');
     const scrollTop = messagesContainer ? messagesContainer.scrollTop : 0;
-    
+
     // Get the original height for comparison
     const originalHeight = event.target.style.height;
-    
+
     // Reset height to properly calculate the new scrollHeight
     event.target.style.height = 'auto';
-    
+
     // Set new height based on content
     const newHeight = event.target.scrollHeight + 5 + 'px';
     event.target.style.height = newHeight;
-    
+
     // If this is an expansion (not first load or shrinking), maintain the scroll position
     if (messagesContainer && originalHeight && parseInt(newHeight) > parseInt(originalHeight)) {
         messagesContainer.scrollTop = scrollTop;
-    }
-};
-
-const onEnterPress = (event) => {
-    // Check if only Enter was pressed without Shift
-    if (!event.shiftKey) {
-        event.preventDefault(); // Prevent the default action to avoid inserting a new line
-        onChatInput();
     }
 };
 
@@ -125,17 +142,65 @@ const getUserIcon = (userId) => {
     return getUser(userId).icon;
 };
 
+// Utility to strip HTML tags
+function stripHtml(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
+}
+
 const handlers = {
     ws_append_chat: (msg) => {
-        chatMessages.value.push({
-            t: Date.now(),
-            user: msg.author,
-            content: processMarkdown(msg.content)
-        });
-        nextTick(() => {
-            postRender();
-            scrollToBottom();
-        });
+        // Check if this is a progress-related message that we should handle with the progress bar
+        const content = msg.content.toLowerCase();
+        const isProgressMessage = content.includes('received file') ||
+                                 content.includes('processing tax file') ||
+                                 content.includes('analysis complete') ||
+                                 content.includes('excel file is ready') ||
+                                 content.includes('csv file detected') ||
+                                 content.includes('note: csv file');
+
+        if (isProgressMessage && showTaxProgress.value) {
+            // Update progress based on message content
+            if (content.includes('csv file detected') || content.includes('note: csv file')) {
+                // CSV warning - keep at step 1 but update text
+                taxProgressStep.value = 1;
+                taxProgressText.value = stripHtml(msg.content);
+            } else if (content.includes('received file')) {
+                taxProgressStep.value = 1;
+                taxProgressText.value = stripHtml(msg.content);
+            } else if (content.includes('processing tax file')) {
+                taxProgressStep.value = 2;
+                taxProgressText.value = extractFileNameFromProcessingMsg(msg.content);
+            } else if (content.includes('analysis complete')) {
+                taxProgressStep.value = 4;
+                taxProgressStatus.value = 'complete';
+                taxProgressText.value = stripHtml(msg.content);
+            } else if (content.includes('excel file is ready')) {
+                // This is the final message, set to 100%
+                taxProgressStep.value = 5;
+                taxProgressStatus.value = 'complete';
+                taxProgressText.value = stripHtml(msg.content);
+
+                // Hide progress bar after a delay
+                setTimeout(() => {
+                    showTaxProgress.value = false;
+                    taxProgressStatus.value = 'idle';
+                    taxProgressStep.value = 0;
+                }, 5000); // Show for 5 seconds after completion
+            }
+        } else {
+            // Regular chat message - add to chat
+            chatMessages.value.push({
+                t: Date.now(),
+                user: msg.author,
+                content: processMarkdown(msg.content)
+            });
+            nextTick(() => {
+                postRender();
+                scrollToBottom();
+            });
+        }
     },
     ws_set_user_data: ({ uid, name, icon }) => {
         console.log('ws_set_user_data received:', { uid, name, icon });
@@ -144,11 +209,84 @@ const handlers = {
     }
 };
 
+// Helper to extract just the file name from the processing message
+function extractFileNameFromProcessingMsg(msg) {
+    // Example: Processing tax file: <span style="color: blue;">ConEd_Golden_5 (1).csv</span>. This may take a few minutes...
+    // We want to extract just the file name
+    const match = msg.match(/Processing tax file: (.*?)(\.|<|$)/i);
+    if (match) {
+        // If it's HTML, strip tags
+        return stripHtml(match[1]);
+    }
+    // Fallback: strip all HTML
+    return stripHtml(msg);
+}
+
 // Scroll to the bottom of the chat
 const scrollToBottom = () => {
     const messagesContainer = document.getElementById('messages');
     if (messagesContainer) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+};
+
+// Handle file upload from the plus icon button
+const handleFileUpload = async (file) => {
+    console.log('File selected for upload:', file.name);
+
+    // Validate file type
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (ext !== '.csv' && ext !== '.xlsx') {
+        console.error('Invalid file type:', ext);
+        return;
+    }
+
+    // Validate file size (10GB limit as per backend)
+    const maxSize = 10_000_000_000; // 10GB
+    if (file.size > maxSize) {
+        console.error('File too large:', file.size);
+        return;
+    }
+
+    // Show progress bar and start progress
+    showTaxProgress.value = true;
+    taxProgressStatus.value = 'processing';
+    taxProgressStep.value = 1;
+    taxProgressText.value = `Received file: ${file.name}. Starting analysis...`;
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Include socket_id for response routing
+        const socket_id = window.socket_id;
+        if (!socket_id) {
+            console.error('No socket_id available');
+            return;
+        }
+        formData.append('socket_id', socket_id);
+
+        console.log(`Uploading ${file.name} to /upload/tax with socket_id ${socket_id}`);
+
+        const response = await fetch('/upload/tax', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        console.log('File uploaded successfully:', file.name);
+
+        // Update progress to show processing
+        taxProgressStep.value = 2;
+        taxProgressText.value = `Processing tax file: ${file.name}. This may take a few minutes...`;
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        taxProgressStatus.value = 'error';
+        taxProgressText.value = `Upload failed: ${error.message}`;
     }
 };
 
