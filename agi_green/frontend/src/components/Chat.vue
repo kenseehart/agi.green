@@ -36,19 +36,31 @@
     <div class="agi-green-flex-container">
         <div id="messages" class="agi-green-messages">
             <div v-for="msg in chatMessages" :key="msg.id" class="agi-green-chat-message-block">
-                <Avatar
-                    :image="getUserIcon(msg.user)"
-                    :alt="`${getUser(msg.user).name}'s avatar`"
-                    :title="getUser(msg.user).name"
-                    shape="circle"
-                />
+                <Avatar :image="getUserIcon(msg.user)" :alt="`${getUser(msg.user).name}'s avatar`"
+                    :title="getUser(msg.user).name" shape="circle" />
                 <div class="agi-green-message-content">
-                <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
-                <div class="agi-green-chat-message" v-html="msg.content"></div>
+                    <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
+                    <div class="agi-green-chat-message" v-html="msg.content"></div>
+                    <template id="message-feedback-template"
+                        v-if="getUser(msg.user).name === AriaConstants.ARIA && !msg.content.includes(AriaConstants.WELCOME_MESSAGE)">
+                        <div class="message-feedback-section">
+                            <button class="feedback-button thumbs-up" :title="AriaConstants.GOOD_RESPONSE">
+                                <span class="material-symbols-outlined" :aria-label="AriaConstants.THUMBS_UP"
+                                    :class="{ 'feedback-selected': messageFeedback[msg.id] === true }"
+                                    @click="sendFeedback(msg.id, true)">thumb_up</span>
+                            </button>
+                            <button class="feedback-button thumbs-down" :title="AriaConstants.BAD_RESPONSE">
+                                <span class="material-symbols-outlined" :aria-label="AriaConstants.THUMBS_DOWN"
+                                    :class="{ 'feedback-selected': messageFeedback[msg.id] === false }"
+                                    @click="sendFeedback(msg.id, false)">thumb_down</span>
+                            </button>
+                        </div>
+                    </template>
                 </div>
             </div>
             <div class="agi-green-chat-input-container">
-                <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress" placeholder="Type your message here..."></textarea>
+                <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress"
+                    placeholder="Ask anything or upload a file"></textarea>
                 <button class="agi-green-chat-send-button" @click="onChatInput">
                     <img src="../assets/send-button.png" alt="Send" />
                 </button>
@@ -65,27 +77,28 @@ import { userData } from '../plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '../emitter';
 import Avatar from 'primevue/avatar';
 import { useFileDrop } from '../composables/useFileDrop';
-
+import AriaConstants from './SharedConstants';
 const send_ws = inject('send_ws');
 
 const chatMessages = ref([]);
 const message = ref('');
+const messageFeedback = ref({}); // Track feedback state for each message
 
 const autoResize = (event) => {
     // Store the original scroll position
     const messagesContainer = document.getElementById('messages');
     const scrollTop = messagesContainer ? messagesContainer.scrollTop : 0;
-    
+
     // Get the original height for comparison
     const originalHeight = event.target.style.height;
-    
+
     // Reset height to properly calculate the new scrollHeight
     event.target.style.height = 'auto';
-    
+
     // Set new height based on content
     const newHeight = event.target.scrollHeight + 5 + 'px';
     event.target.style.height = newHeight;
-    
+
     // If this is an expansion (not first load or shrinking), maintain the scroll position
     if (messagesContainer && originalHeight && parseInt(newHeight) > parseInt(originalHeight)) {
         messagesContainer.scrollTop = scrollTop;
@@ -111,6 +124,19 @@ const onChatInput = () => {
     if (textarea) {
         textarea.style.height = '50px';
     }
+};
+
+const sendFeedback = (messageId, isPositive) => {
+    // Clear any existing feedback for this message
+    messageFeedback.value = {
+        ...messageFeedback.value,
+        [messageId]: isPositive
+    };
+
+    send_ws('feedback', {
+        content: isPositive ? AriaConstants.GOOD_RESPONSE : AriaConstants.BAD_RESPONSE,
+        message_id: messageId
+    });
 };
 
 const { proxy } = getCurrentInstance();
@@ -186,5 +212,49 @@ textarea {
     height: 40px;
     margin-right: 10px;
     flex-shrink: 0;
+}
+
+.material-symbols-outlined {
+    cursor: pointer;
+    transition: color 0.2s ease;
+    font-variation-settings: 'FILL' 0;
+}
+
+
+.feedback-button {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.feedback-button:hover .material-symbols-outlined {
+    opacity: 0.8;
+}
+
+.message-feedback-section {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+}
+
+/* .feedback-selected {
+    color: #2196F3 !important;
+    font-variation-settings: 'FILL' 1 !important;
+} */
+
+/* Add link to Material Symbols font if not already present */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0');
+
+.agi-green-message-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.agi-green-chat-message {
+    margin-bottom: 4px;
 }
 </style>
