@@ -3,17 +3,21 @@
  * Description: A chat component that displays chat messages and allows users to send new messages.
  *
  * Props:
- *   - None
+ *   - ariaFeedbackLike: A string that is used as the aria-label for the like button.
+ *   - ariaFeedbackDislike: A string that is used as the aria-label for the dislike button.
+ *   - placeholder: A string that is used as the placeholder for the textarea.
  *
  * Data:
  *   - chatMessages: An array of chat messages.
  *   - message: The current message being typed by the user.
+ *   - messageFeedback: An object that tracks feedback state for each message.
  *
  * Methods:
  *   - autoResize: A method that automatically resizes the textarea based on its content.
  *   - onChatInput: A method that sends the chat message when the user clicks the send button.
  *   - getUser: A method that retrieves user data based on the user ID.
  *   - getUserIcon: A method that retrieves the user's avatar icon based on the user ID.
+ *   - sendFeedback: A method that sends feedback for a message.
  *
  * Hooks:
  *   - onMounted: A hook that binds event handlers when the component is mounted.
@@ -41,6 +45,7 @@
                 <div class="agi-green-message-content">
                     <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
                     <div class="agi-green-chat-message" v-html="msg.content"></div>
+                    <!-- Add feedback to the message if the user is Aria and the message is not a welcome message -->
                     <template id="message-feedback-template"
                         v-if="getUser(msg.user).name === 'Aria' && !msg.content.includes('Welcome')">
                         <div class="message-feedback-section">
@@ -56,6 +61,7 @@
                             </button>
                         </div>
                     </template>
+                    <!-- End of feedback -->
                 </div>
             </div>
             <div class="agi-green-chat-input-container">
@@ -139,6 +145,7 @@ const onChatInput = () => {
 };
 
 const sendFeedback = (messageId, isPositive) => {
+    // Add feedback to the message
     // Clear any existing feedback for this message
     messageFeedback.value = {
         ...messageFeedback.value,
