@@ -42,15 +42,15 @@
                     <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
                     <div class="agi-green-chat-message" v-html="msg.content"></div>
                     <template id="message-feedback-template"
-                        v-if="getUser(msg.user).name === AriaConstants.ARIA && !msg.content.includes(AriaConstants.WELCOME_MESSAGE)">
+                        v-if="getUser(msg.user).name === 'Aria' && !msg.content.includes('Welcome')">
                         <div class="message-feedback-section">
-                            <button class="feedback-button thumbs-up" :title="AriaConstants.GOOD_RESPONSE">
-                                <span class="material-symbols-outlined" :aria-label="AriaConstants.THUMBS_UP"
+                            <button class="feedback-button thumbs-up" :title="ariaFeedbackLike">
+                                <span class="material-symbols-outlined" :aria-label="ariaFeedbackLike"
                                     :class="{ 'feedback-selected': messageFeedback[msg.id] === true }"
                                     @click="sendFeedback(msg.id, true)">thumb_up</span>
                             </button>
-                            <button class="feedback-button thumbs-down" :title="AriaConstants.BAD_RESPONSE">
-                                <span class="material-symbols-outlined" :aria-label="AriaConstants.THUMBS_DOWN"
+                            <button class="feedback-button thumbs-down" :title="ariaFeedbackDislike">
+                                <span class="material-symbols-outlined" :aria-label="ariaFeedbackDislike"
                                     :class="{ 'feedback-selected': messageFeedback[msg.id] === false }"
                                     @click="sendFeedback(msg.id, false)">thumb_down</span>
                             </button>
@@ -60,7 +60,7 @@
             </div>
             <div class="agi-green-chat-input-container">
                 <textarea id="chat-input-text" v-model="message" @input="autoResize" @keyup.enter="onEnterPress"
-                    placeholder="Ask anything or upload a file"></textarea>
+                    :placeholder="placeholder"></textarea>
                 <button class="agi-green-chat-send-button" @click="onChatInput">
                     <img src="../assets/send-button.png" alt="Send" />
                 </button>
@@ -77,13 +77,25 @@ import { userData } from '../plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '../emitter';
 import Avatar from 'primevue/avatar';
 import { useFileDrop } from '../composables/useFileDrop';
-import AriaConstants from './SharedConstants';
 const send_ws = inject('send_ws');
 
 const chatMessages = ref([]);
 const message = ref('');
 const messageFeedback = ref({}); // Track feedback state for each message
-
+const props = defineProps({
+    ariaFeedbackLike: {
+        type: String,
+        default: 'Like'
+    },
+    ariaFeedbackDislike: {
+        type: String,
+        default: 'Dislike'
+    },
+    placeholder: {
+        type: String,
+        default: 'Ask anything or upload a file'
+    }
+});
 const autoResize = (event) => {
     // Store the original scroll position
     const messagesContainer = document.getElementById('messages');
@@ -134,7 +146,7 @@ const sendFeedback = (messageId, isPositive) => {
     };
 
     send_ws('feedback', {
-        content: isPositive ? AriaConstants.GOOD_RESPONSE : AriaConstants.BAD_RESPONSE,
+        content: isPositive ? ariaFeedbackLike : ariaFeedbackDislike,
         message_id: messageId
     });
 };
