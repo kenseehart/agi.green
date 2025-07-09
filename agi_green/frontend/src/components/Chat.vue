@@ -47,7 +47,7 @@
                     <div class="agi-green-chat-message" v-html="msg.content"></div>
                     <!-- Add feedback to the message if the user is Aria and the message is not a welcome message -->
                     <template id="message-feedback-template"
-                        v-if="getUser(msg.user).name === 'Aria' && !msg.content.includes('Welcome')">
+                        v-if="getUser(msg.user).name === 'Aria' && !msg.content.includes('Welcome')&& !msg.content.includes('How can I')">
                         <div class="message-feedback-section">
                             <button class="feedback-button thumbs-up" :title="ariaFeedbackLike">
                                 <span class="material-symbols-outlined" :aria-label="ariaFeedbackLike"
