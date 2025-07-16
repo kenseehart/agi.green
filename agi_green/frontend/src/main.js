@@ -18,6 +18,7 @@ import MDForm from './components/MDForm.vue';
 import GameIO from './components/GameIO.vue';
 import TwoPaneLayout from './layouts/TwoPaneLayout.vue';
 import ResizableLayout from './components/ResizableLayout.vue';
+import TaxProgressBar from './components/TaxProgressBar.vue';
 
 import PerfectScrollbar from 'vue3-perfect-scrollbar'
 import 'vue3-perfect-scrollbar/dist/vue3-perfect-scrollbar.css'
@@ -41,6 +42,7 @@ app.component('MDForm', MDForm);
 app.component('GameIO', GameIO);
 app.component('TwoPaneLayout', TwoPaneLayout);
 app.component('ResizableLayout', ResizableLayout);
+app.component('TaxProgressBar', TaxProgressBar);
 app.component('Vueform', Vueform.Form);
 app.mount('#app');
 
@@ -51,6 +53,7 @@ export { default as MDForm } from './components/MDForm.vue'
 export { default as GameIO } from './components/GameIO.vue'
 export { default as ResizableLayout } from './components/ResizableLayout.vue'
 export { default as MarkdownView } from './components/Markdown.vue'
+export { default as TaxProgressBar } from './components/TaxProgressBar.vue'
 
 // Layouts
 export { default as TwoPaneLayout } from './layouts/TwoPaneLayout.vue'
