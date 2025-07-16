@@ -69,7 +69,7 @@
                 </div>
             </div>
 
-            <ChatInput v-model="message" @input="autoResize" @send="onChatInput" @file="handleFileUpload" />
+            <ChatInput v-model="message" @input="autoResize" @send="onChatInput" @file="handleFileUpload" :placeholder="props.placeholder"/>
         </div>
     </div>
 </template>
@@ -89,7 +89,12 @@ const send_ws = inject('send_ws');
 
 const chatMessages = ref([]);
 const message = ref('');
-
+const props = defineProps({
+    placeholder: {
+        type: String,
+        default: 'Ask anything or upload a file'
+    },
+})
 // Tax progress tracking
 const showTaxProgress = ref(false);
 const taxProgressStatus = ref('idle');
