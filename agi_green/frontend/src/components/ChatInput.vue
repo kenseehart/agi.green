@@ -2,7 +2,7 @@
   <div class="input-container" style="display: flex;align-items: center;">
     <textarea
       v-model="text"
-      placeholder="Type your message here..."
+      :placeholder="props.placeholder"
       @input="handleInput"
       @keyup.enter="onEnterPress"
       class="text-input"
@@ -28,7 +28,12 @@ const emit = defineEmits(['send', 'file', 'input']);
 const text = ref('');
 const isTyping = ref(false);
 const fileInput = ref(null);
-
+const props = defineProps({
+  placeholder: {
+        type: String,
+        default: 'Ask anything or upload a file'
+    }
+})
 function handleInput(e) {
   text.value = e.target.value;
   isTyping.value = !!text.value.trim();
