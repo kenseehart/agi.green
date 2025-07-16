@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.4] - 2025-07-16
+
+### Added
+- Chat feedback (thumbs up/down)
+- Upload and progress bar
+
+### Security
+- replace polyfill.io with cdnjs.cloudflare.com
+
 ## [0.4.3] - 2025-06-10
 
 ### Fixed
