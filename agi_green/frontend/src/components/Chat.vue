@@ -100,7 +100,7 @@ const props = defineProps({
     },
     ariaFeedbackLike: {
         type: String,
-        default: 'This response was helpful'
+        default: 'Like'
     },
     ariaFeedbackDislike: {
         type: String,
