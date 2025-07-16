@@ -47,15 +47,15 @@
                     <div class="agi-green-chat-message" v-html="msg.content"></div>
                     <!-- Add feedback to the message if the user is Aria and the message is not a welcome message -->
                     <template id="message-feedback-template"
-                        v-if="getUser(msg.user).name === 'Aria' && !msg.content.includes('Welcome')&& !msg.content.includes('How can I')">
+                        v-if="shouldShowFeedback(msg)">
                         <div class="message-feedback-section">
-                            <button class="feedback-button thumbs-up" :title="ariaFeedbackLike">
-                                <span class="material-symbols-outlined" :aria-label="ariaFeedbackLike"
+                            <button class="feedback-button thumbs-up" :title="props.ariaFeedbackLike">
+                                <span class="material-symbols-outlined" :aria-label="props.ariaFeedbackLike"
                                     :class="{ 'feedback-selected': messageFeedback[msg.id] === true }"
                                     @click="sendFeedback(msg.id, true)">thumb_up</span>
                             </button>
-                            <button class="feedback-button thumbs-down" :title="ariaFeedbackDislike">
-                                <span class="material-symbols-outlined" :aria-label="ariaFeedbackDislike"
+                            <button class="feedback-button thumbs-down" :title="props.ariaFeedbackDislike">
+                                <span class="material-symbols-outlined" :aria-label="props.ariaFeedbackDislike"
                                     :class="{ 'feedback-selected': messageFeedback[msg.id] === false }"
                                     @click="sendFeedback(msg.id, false)">thumb_down</span>
                             </button>
@@ -83,15 +83,24 @@ import { userData } from '../plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '../emitter';
 import Avatar from 'primevue/avatar';
 import { useFileDrop } from '../composables/useFileDrop';
+import { array } from '@vueform/vueform';
 const send_ws = inject('send_ws');
 
 const chatMessages = ref([]);
 const message = ref('');
 const messageFeedback = ref({}); // Track feedback state for each message
 const props = defineProps({
+    agentName: {
+        type: String,
+        default: 'Aria'
+    },
+    skipFeedback: {
+        type: Array,
+        default: () => ['Welcome', 'How can I']
+    },
     ariaFeedbackLike: {
         type: String,
-        default: 'Like'
+        default: 'This response was helpful'
     },
     ariaFeedbackDislike: {
         type: String,
@@ -100,6 +109,10 @@ const props = defineProps({
     placeholder: {
         type: String,
         default: 'Ask anything or upload a file'
+    },
+    showFileUpload: {
+        type: Boolean,
+        default: true
     }
 });
 const autoResize = (event) => {
@@ -153,7 +166,7 @@ const sendFeedback = (messageId, isPositive) => {
     };
 
     send_ws('feedback', {
-        content: isPositive ? ariaFeedbackLike : ariaFeedbackDislike,
+        content: isPositive ? props.ariaFeedbackLike : props.ariaFeedbackDislike,
         message_id: messageId
     });
 };
@@ -168,6 +181,12 @@ const getUser = (userId) => {
 // Helper to get user icon
 const getUserIcon = (userId) => {
     return getUser(userId).icon;
+};
+
+
+const shouldShowFeedback = (msg) => {
+  return getUser(msg.user).name === props.agentName &&
+         !props.skipFeedback.some(text => msg.content.includes(text));
 };
 
 const handlers = {
