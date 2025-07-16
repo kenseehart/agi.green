@@ -3,17 +3,21 @@
  * Description: A chat component that displays chat messages and allows users to send new messages.
  *
  * Props:
- *   - None
+ *   - ariaFeedbackLike: A string that is used as the aria-label for the like button.
+ *   - ariaFeedbackDislike: A string that is used as the aria-label for the dislike button.
+ *   - placeholder: A string that is used as the placeholder for the textarea.
  *
  * Data:
  *   - chatMessages: An array of chat messages.
  *   - message: The current message being typed by the user.
+ *   - messageFeedback: An object that tracks feedback state for each message.
  *
  * Methods:
  *   - autoResize: A method that automatically resizes the textarea based on its content.
  *   - onChatInput: A method that sends the chat message when the user clicks the send button.
  *   - getUser: A method that retrieves user data based on the user ID.
  *   - getUserIcon: A method that retrieves the user's avatar icon based on the user ID.
+ *   - sendFeedback: A method that sends feedback for a message.
  *
  * Hooks:
  *   - onMounted: A hook that binds event handlers when the component is mounted.
@@ -36,17 +40,31 @@
     <div class="agi-green-flex-container">
         <div id="messages" class="agi-green-messages">
             <div v-for="msg in chatMessages" :key="msg.id" class="agi-green-chat-message-block">
-                <Avatar
-                    :image="getUserIcon(msg.user)"
-                    :alt="`${getUser(msg.user).name}'s avatar`"
-                    :title="getUser(msg.user).name"
-                    shape="circle"
-                />
+                <Avatar :image="getUserIcon(msg.user)" :alt="`${getUser(msg.user).name}'s avatar`"
+                    :title="getUser(msg.user).name" shape="circle" />
                 <div class="agi-green-message-content">
-                <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
-                <div class="agi-green-chat-message" v-html="msg.content"></div>
+                    <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
+                    <div class="agi-green-chat-message" v-html="msg.content"></div>
+                    <!-- Add feedback to the message if the user is Aria and the message is not a welcome message -->
+                    <template id="message-feedback-template"
+                        v-if="shouldShowFeedback(msg)">
+                        <div class="message-feedback-section">
+                            <button class="feedback-button thumbs-up" :title="props.ariaFeedbackLike">
+                                <span class="material-symbols-outlined" :aria-label="props.ariaFeedbackLike"
+                                    :class="{ 'feedback-selected': messageFeedback[msg.id] === true }"
+                                    @click="sendFeedback(msg.id, true)">thumb_up</span>
+                            </button>
+                            <button class="feedback-button thumbs-down" :title="props.ariaFeedbackDislike">
+                                <span class="material-symbols-outlined" :aria-label="props.ariaFeedbackDislike"
+                                    :class="{ 'feedback-selected': messageFeedback[msg.id] === false }"
+                                    @click="sendFeedback(msg.id, false)">thumb_down</span>
+                            </button>
+                        </div>
+                    </template>
+                    <!-- End of feedback -->
                 </div>
             </div>
+
 
             <!-- Tax Progress Bar -->
             <div v-if="showTaxProgress" class="agi-green-chat-message-block">
@@ -67,6 +85,7 @@
                     />
                 </div>
                 </div>
+
             </div>
 
             <ChatInput v-model="message" @input="autoResize" @send="onChatInput" @file="handleFileUpload" :placeholder="props.placeholder"/>
@@ -84,17 +103,41 @@ import Avatar from 'primevue/avatar';
 import ChatInput from './ChatInput.vue';
 import TaxProgressBar from './TaxProgressBar.vue';
 import { useFileDrop } from '../composables/useFileDrop';
-
+import { array } from '@vueform/vueform';
 const send_ws = inject('send_ws');
 
 const chatMessages = ref([]);
 const message = ref('');
+
+const messageFeedback = ref({}); // Track feedback state for each message
 const props = defineProps({
+    agentName: {
+        type: String,
+        default: 'Aria'
+    },
+    skipFeedback: {
+        type: Array,
+        default: () => ['Welcome', 'How can I']
+    },
+    ariaFeedbackLike: {
+        type: String,
+        default: 'Like'
+    },
+    ariaFeedbackDislike: {
+        type: String,
+        default: 'Dislike'
+    },
+
     placeholder: {
         type: String,
         default: 'Ask anything or upload a file'
     },
-})
+     showFileUpload: {
+        type: Boolean,
+        default: true
+    }
+});
+
 // Tax progress tracking
 const showTaxProgress = ref(false);
 const taxProgressStatus = ref('idle');
@@ -135,6 +178,20 @@ const onChatInput = () => {
     }
 };
 
+const sendFeedback = (messageId, isPositive) => {
+    // Add feedback to the message
+    // Clear any existing feedback for this message
+    messageFeedback.value = {
+        ...messageFeedback.value,
+        [messageId]: isPositive
+    };
+
+    send_ws('feedback', {
+        content: isPositive ? props.ariaFeedbackLike : props.ariaFeedbackDislike,
+        message_id: messageId
+    });
+};
+
 const { proxy } = getCurrentInstance();
 
 // Function to get user data or default values
@@ -147,12 +204,20 @@ const getUserIcon = (userId) => {
     return getUser(userId).icon;
 };
 
+
 // Utility to strip HTML tags
 function stripHtml(html) {
     const div = document.createElement('div');
     div.innerHTML = html;
     return div.textContent || div.innerText || '';
 }
+
+
+const shouldShowFeedback = (msg) => {
+  return getUser(msg.user).name === props.agentName &&
+         !props.skipFeedback.some(text => msg.content.includes(text));
+};
+
 
 const handlers = {
     ws_append_chat: (msg) => {
@@ -329,5 +394,49 @@ textarea {
     height: 40px;
     margin-right: 10px;
     flex-shrink: 0;
+}
+
+.material-symbols-outlined {
+    cursor: pointer;
+    transition: color 0.2s ease;
+    font-variation-settings: 'FILL' 0;
+}
+
+
+.feedback-button {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.feedback-button:hover .material-symbols-outlined {
+    opacity: 0.8;
+}
+
+.message-feedback-section {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+}
+
+/* .feedback-selected {
+    color: #2196F3 !important;
+    font-variation-settings: 'FILL' 1 !important;
+} */
+
+/* Add link to Material Symbols font if not already present */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0');
+
+.agi-green-message-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.agi-green-chat-message {
+    margin-bottom: 4px;
 }
 </style>

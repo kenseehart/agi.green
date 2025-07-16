@@ -13,7 +13,7 @@ schema:
   h2:
     type: static
     tag: h3
-    content: ARIA Login
+    content: Login
   user:
     type: text
     label: Screen Name or Email
@@ -33,7 +33,7 @@ schema:
   h2:
     type: static
     tag: h3
-    content: ARIA Registration
+    content: Registration
   screen_name:
     type: text
     label: Screen Name
@@ -68,10 +68,10 @@ class UserProtocol(Protocol):
             # Set email as confirmed
             users_collection = get_collection("users")
             await users_collection.update_one(
-                {"email": email}, 
+                {"email": email},
                 {"$set": {"email_confirmed": True}}
             )
-        return result   
+        return result
 
     async def create_user(self, email: str, screen_name: str, password: str) -> str:
         '''create a new user, return status:
@@ -220,7 +220,7 @@ class UserProtocol(Protocol):
 
                 if user and not user['email_confirmed'] == True:
                     await self.send('ws', 'append_chat', author='info', content="Please confirm your email before logging in.")
-                
+
                 return False
 
             if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
