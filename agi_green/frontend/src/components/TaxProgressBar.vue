@@ -7,10 +7,28 @@
       <span class="progress-percentage">{{ Math.round(progressPercentage) }}%</span>
     </div>
 
-    <div class="progress-bar">
+    <div
+      :style="{
+        width: '100%',
+        height: '8px',
+        backgroundColor: '#e0e0e0',
+        borderRadius: '4px',
+        overflow: 'hidden',
+        position: 'relative',
+        marginBottom: '0.5rem'
+      }"
+    >
       <div
-        class="progress-bar-fill"
-        :style="{ width: progressPercentage + '%' }"
+        :style="{
+          width: progressPercentage + '%',
+          height: '100%',
+          background: 'linear-gradient(90deg, #4caf50, #45a049)',
+          transition: 'width 0.3s ease-in-out',
+          borderRadius: '4px',
+          position: 'absolute',
+          top: '0',
+          left: '0'
+        }"
       ></div>
     </div>
 
@@ -19,6 +37,7 @@
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { ref, computed, watch } from 'vue'

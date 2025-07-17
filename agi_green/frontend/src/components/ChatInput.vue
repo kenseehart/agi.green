@@ -1,8 +1,8 @@
 <template>
   <div class="input-container" style="display: flex;align-items: center;">
     <textarea
-      v-model="text"
-      :placeholder="props.placeholder"
+    v-model="modelValue"
+    :placeholder="props.placeholder"
       @input="handleInput"
       @keyup.enter="onEnterPress"
       class="text-input"
@@ -28,6 +28,7 @@ const emit = defineEmits(['send', 'file', 'input']);
 const text = ref('');
 const isTyping = ref(false);
 const fileInput = ref(null);
+const modelValue = defineModel();
 const props = defineProps({
   placeholder: {
         type: String,
@@ -41,9 +42,14 @@ function handleInput(e) {
 }
 
 function onEnterPress(event) {
-  if (!event.shiftKey) {
-    event.preventDefault();
-    emit('send');
+  if (event.key === 'Enter') {
+    if (event.shiftKey) {
+      // Allow newline — do nothing
+      return;
+    } else {
+      event.preventDefault(); // prevent newline
+      emit('send');
+    }
   }
 }
 
