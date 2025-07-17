@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.5] - 2025-07-17
+
+### Added
+- Improved progress bar
+- Shift-Enter to support newline in chat
+
 ## [0.4.4] - 2025-07-16
 
 ### Added
