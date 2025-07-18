@@ -33,7 +33,8 @@
     </div>
 
     <div class="progress-status">
-      <span class="status-text">{{ statusText }}</span>
+      <Markdown v-if="currentStep === 1" :markdownContent="statusText" />
+      <span class="status-text" v-else>{{ statusText }}</span>
     </div>
   </div>
 </template>
@@ -41,7 +42,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-
+import Markdown from './Markdown.vue'
 const props = defineProps({
   status: {
     type: String,
