@@ -177,6 +177,15 @@ const onChatInput = () => {
     if (textarea) {
         textarea.style.height = '50px';
     }
+    chatMessages.value.push({
+        t: Date.now(),
+        user: 'user',
+        content: trimmedMessage
+    });
+    nextTick(() => {
+        postRender();
+        scrollToBottom();
+    });
 };
 
 const sendFeedback = (messageId, isPositive) => {
