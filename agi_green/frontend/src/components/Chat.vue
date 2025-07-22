@@ -104,11 +104,12 @@ import ChatInput from './ChatInput.vue';
 import TaxProgressBar from './TaxProgressBar.vue';
 import { useFileDrop } from '../composables/useFileDrop';
 import { array } from '@vueform/vueform';
+import MDForm from './MDForm.vue';
 const send_ws = inject('send_ws');
 
 const chatMessages = ref([]);
 const message = ref('');
-
+const isProgressMessage = ref(false);
 const messageFeedback = ref({}); // Track feedback state for each message
 const props = defineProps({
     agentName: {
@@ -176,6 +177,15 @@ const onChatInput = () => {
     if (textarea) {
         textarea.style.height = '50px';
     }
+    chatMessages.value.push({
+        t: Date.now(),
+        user: 'user',
+        content: trimmedMessage
+    });
+    nextTick(() => {
+        postRender();
+        scrollToBottom();
+    });
 };
 
 const sendFeedback = (messageId, isPositive) => {
@@ -223,14 +233,13 @@ const handlers = {
     ws_append_chat: (msg) => {
         // Check if this is a progress-related message that we should handle with the progress bar
         const content = msg.content.toLowerCase();
-        const isProgressMessage = content.includes('received file') ||
+         isProgressMessage.value = content.includes('received file') ||
                                  content.includes('processing tax file') ||
                                  content.includes('analysis complete') ||
                                  content.includes('excel file is ready') ||
                                  content.includes('csv file detected') ||
                                  content.includes('note: csv file');
-
-        if (isProgressMessage && showTaxProgress.value) {
+        if (isProgressMessage.value && showTaxProgress.value) {
             // Update progress based on message content
             if (content.includes('csv file detected') || content.includes('note: csv file')) {
                 // CSV warning - keep at step 1 but update text
@@ -238,7 +247,7 @@ const handlers = {
                 taxProgressText.value = stripHtml(msg.content);
             } else if (content.includes('received file')) {
                 taxProgressStep.value = 1;
-                taxProgressText.value = stripHtml(msg.content);
+                taxProgressText.value = msg.content;
             } else if (content.includes('processing tax file')) {
                 taxProgressStep.value = 2;
                 taxProgressText.value = extractFileNameFromProcessingMsg(msg.content);
@@ -257,6 +266,7 @@ const handlers = {
                     showTaxProgress.value = false;
                     taxProgressStatus.value = 'idle';
                     taxProgressStep.value = 0;
+                    isProgressMessage.value = false
                 }, 5000); // Show for 5 seconds after completion
             }
         } else {
@@ -319,10 +329,10 @@ const handleFileUpload = async (file) => {
     }
 
     // Show progress bar and start progress
-    showTaxProgress.value = true;
-    taxProgressStatus.value = 'processing';
-    taxProgressStep.value = 1;
-    taxProgressText.value = `Received file: ${file.name}. Starting analysis...`;
+     showTaxProgress.value = true;
+    // taxProgressStatus.value = 'processing';
+    // taxProgressStep.value = 1;
+    // taxProgressText.value = `Received file: ${file.name}. Starting analysis...`;
 
     try {
         const formData = new FormData();
@@ -347,11 +357,11 @@ const handleFileUpload = async (file) => {
             throw new Error(`Upload failed: ${response.statusText}`);
         }
 
-        console.log('File uploaded successfully:', file.name);
+        // console.log('File uploaded successfully:', file.name);
 
-        // Update progress to show processing
-        taxProgressStep.value = 2;
-        taxProgressText.value = `Processing tax file: ${file.name}. This may take a few minutes...`;
+        // // Update progress to show processing
+        // taxProgressStep.value = 2;
+        // taxProgressText.value = `Processing tax file: ${file.name}. This may take a few minutes...`;
 
     } catch (error) {
         console.error('Upload error:', error);

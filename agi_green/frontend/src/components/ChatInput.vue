@@ -8,9 +8,9 @@
       class="text-input"
       id="chat-input-text"
     ></textarea>
-    <div @click="triggerFileInput" class="attach-button">
+    <!-- <div @click="triggerFileInput" class="attach-button">
       <img src="../assets/plusIcon.svg" alt="Attach file"  style="width:30px; height:30px;"/>
-    </div>
+    </div> -->
     <input
       ref="fileInput"
       type="file"
