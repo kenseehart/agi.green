@@ -39,8 +39,8 @@
 <template>
     <div class="agi-green-flex-container">
         <div id="messages" class="agi-green-messages">
-            <div v-for="msg in chatMessages" :key="msg.id" class="agi-green-chat-message-block">
-                <Avatar :image="getUserIcon(msg.user)" :alt="`${getUser(msg.user).name}'s avatar`"
+            <div v-for="msg in chatMessages" :key="msg.id" class="agi-green-chat-message-block" :class="{ 'message-from-user': msg.user !== props.agentName }">
+                <Avatar v-if="msg.user === props.agentName" :image="getUserIcon(msg.user)" :alt="`${getUser(msg.user).name}'s avatar`"
                     :title="getUser(msg.user).name" shape="circle" />
                 <div class="agi-green-message-content">
                     <div class="agi-green-username">{{ getUser(msg.user).name }}</div>
@@ -274,7 +274,8 @@ const handlers = {
             chatMessages.value.push({
                 t: Date.now(),
                 user: msg.author,
-                content: processMarkdown(msg.content)
+                content: processMarkdown(msg.content),
+                id: msg.id
             });
             nextTick(() => {
                 postRender();
@@ -448,5 +449,18 @@ textarea {
 
 .agi-green-chat-message {
     margin-bottom: 4px;
+}
+.message-from-user .agi-green-chat-message {
+    border: 1px solid var(--panel-light-gray) !important;
+}
+
+.message-from-user .p-avatar.p-avatar-image {
+    /* Hide avatar image for User messages */
+    display: none !important;
+}
+
+.message-from-user .agi-green-message-content .agi-green-chat-message {
+    background-color: var(--panel-cloud-gray) !important;
+    text-align: right !important;
 }
 </style>
