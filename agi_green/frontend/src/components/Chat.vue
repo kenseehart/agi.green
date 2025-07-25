@@ -67,7 +67,7 @@
 
 
             <!-- Tax Progress Bar -->
-            <div v-if="showTaxProgress" class="agi-green-chat-message-block">
+            <div v-if="checkVertical &&  isProgressMessage" class="agi-green-chat-message-block">
                 <Avatar
                     :image="getUserIcon('Aria')"
                     :alt="'Aria\'s avatar'"
@@ -78,6 +78,7 @@
                 <div class="agi-green-username">Aria</div>
                 <div class="agi-green-chat-message">
                     <TaxProgressBar
+                        :percentage="taxProgressPercentage"
                         :status="taxProgressStatus"
                         :current-step="taxProgressStep"
                         :total-steps="5"
@@ -88,14 +89,14 @@
 
             </div>
 
-            <ChatInput v-model="message" @input="autoResize" @send="onChatInput" @file="handleFileUpload" :placeholder="props.placeholder"/>
+            <ChatInput v-model="message" @input="autoResize" @send="onChatInput" @file="handleFileUpload" :placeholder="props.placeholder" :vertical="props.vertical"/>
         </div>
     </div>
 </template>
 
 
 <script setup>
-import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, inject, nextTick } from 'vue';
+import { ref, onMounted, getCurrentInstance, onBeforeUnmount, watchEffect, computed, inject, nextTick } from 'vue';
 import { processMarkdown, postRender } from '../plugins/markdownPlugin';
 import { userData } from '../plugins/userDataPlugin';
 import { bind_handlers, unbind_handlers } from '../emitter';
@@ -136,15 +137,19 @@ const props = defineProps({
      showFileUpload: {
         type: Boolean,
         default: true
+    },
+    vertical: {
+        type: String,
+        default: null
     }
 });
 
 // Tax progress tracking
-const showTaxProgress = ref(false);
+//const showTaxProgress = ref(false);
 const taxProgressStatus = ref('idle');
 const taxProgressStep = ref(0);
 const taxProgressText = ref('Ready to process');
-
+const taxProgressPercentage = ref(0);
 const autoResize = (event) => {
     // Store the original scroll position
     const messagesContainer = document.getElementById('messages');
@@ -165,6 +170,9 @@ const autoResize = (event) => {
         messagesContainer.scrollTop = scrollTop;
     }
 };
+const checkVertical = computed(() => {
+    return props.vertical === 'tax';
+})
 
 const onChatInput = () => {
     const trimmedMessage = message.value.trim();
@@ -230,17 +238,27 @@ const shouldShowFeedback = (msg) => {
 
 
 const handlers = {
+    ws_progress_update: (msg) => {
+        taxProgressPercentage.value = msg.progress_percentage;
+    },
     ws_append_chat: (msg) => {
         // Check if this is a progress-related message that we should handle with the progress bar
         const content = msg.content.toLowerCase();
-         isProgressMessage.value = content.includes('received file') ||
+
+         isProgressMessage.value =content.includes('Starting analysis') ||
+                                 content.includes('received file') ||
                                  content.includes('processing tax file') ||
                                  content.includes('analysis complete') ||
                                  content.includes('excel file is ready') ||
                                  content.includes('csv file detected') ||
                                  content.includes('note: csv file');
-        if (isProgressMessage.value && showTaxProgress.value) {
+        if (isProgressMessage.value && checkVertical.value) {
             // Update progress based on message content
+            if(content.includes('Starting analysis')){
+                taxProgressStatus.value = 'processing';
+                taxProgressStep.value = 1;
+                taxProgressText.value = msg.content;
+            }
             if (content.includes('csv file detected') || content.includes('note: csv file')) {
                 // CSV warning - keep at step 1 but update text
                 taxProgressStep.value = 1;
@@ -250,7 +268,7 @@ const handlers = {
                 taxProgressText.value = msg.content;
             } else if (content.includes('processing tax file')) {
                 taxProgressStep.value = 2;
-                taxProgressText.value = extractFileNameFromProcessingMsg(msg.content);
+                taxProgressText.value = stripHtml(msg.content);
             } else if (content.includes('analysis complete')) {
                 taxProgressStep.value = 4;
                 taxProgressStatus.value = 'complete';
@@ -263,7 +281,7 @@ const handlers = {
 
                 // Hide progress bar after a delay
                 setTimeout(() => {
-                    showTaxProgress.value = false;
+                    // showTaxProgress.value = false;
                     taxProgressStatus.value = 'idle';
                     taxProgressStep.value = 0;
                     isProgressMessage.value = false
@@ -330,10 +348,10 @@ const handleFileUpload = async (file) => {
     }
 
     // Show progress bar and start progress
-     showTaxProgress.value = true;
-    // taxProgressStatus.value = 'processing';
-    // taxProgressStep.value = 1;
-    // taxProgressText.value = `Received file: ${file.name}. Starting analysis...`;
+    //  showTaxProgress.value = true;
+    //  taxProgressStatus.value = 'processing';
+    //  taxProgressStep.value = 1;
+    //  taxProgressText.value = `Received file: ${file.name}. Starting analysis...`;
 
     try {
         const formData = new FormData();
