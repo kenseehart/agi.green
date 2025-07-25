@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.6] - 2025-07-23
+
+### Added
+- Improved progress bar
+
 ## [0.4.5] - 2025-07-17
 
 ### Added
