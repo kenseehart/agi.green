@@ -1,7 +1,7 @@
 {
   "name": "agi.green",
   "private": false,
-  "version": "0.4.6",
+  "version": "0.4.7",
   "type": "module",
   "main": "dist/agi.green.umd.js",
   "module": "dist/agi.green.es.js",
