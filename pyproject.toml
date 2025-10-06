@@ -22,7 +22,7 @@ dependencies = [
     "aiofiles~=24.1.0",
     "aio_pika~=9.2.0",
     "bcrypt",
-    "motor",
+    "beanie>=2.0.0",
     "aiosmtplib",
     "markdown",
     "ptvsd~=4.3.2",

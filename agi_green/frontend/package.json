@@ -1,7 +1,7 @@
 {
   "name": "agi.green",
   "private": false,
-  "version": "0.4.4",
+  "version": "0.4.7",
   "type": "module",
   "main": "dist/agi.green.umd.js",
   "module": "dist/agi.green.es.js",
@@ -30,7 +30,7 @@
     "primeicons": "^6.0.1",
     "primevue": "^3.48.1",
     "vue": "^3.4.15",
-    "vue3-perfect-scrollbar": "^1.6.1",
+    "vue3-perfect-scrollbar": "1.6.1",
     "websocket": "^1.0.34"
   },
   "devDependencies": {
@@ -42,5 +42,17 @@
   "peerDependencies": {
     "primevue": "^3.48.1",
     "vue": "^3.4.15"
+  },
+  "overrides": {
+    "vite": {
+      "esbuild": "0.25.0"
+    },
+    "mermaid": {
+      "dompurify": "3.2.4"
+    },
+    "vue3-perfect-scrollbar": {
+      "postcss": "8.4.35",
+      "postcss-import": "16.0.0"
+    }
   }
 }
