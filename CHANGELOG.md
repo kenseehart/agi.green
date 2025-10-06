@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.8] - 2025-10-06
+
+### Removed
+- Chat feedback buttons (thumbs up/down) from message interface
+
 ## [0.4.7] - 2025-07-25
 
 ### Added
