@@ -1,13 +1,14 @@
 <template>
   <div class="tax-progress-container">
-    <div class="progress-header">
+    <div v-if="percentage > 0" class="progress-header">
       <span class="progress-text">
-        Step {{ currentStep }} of {{ totalSteps }}: {{ currentStepLabel }}
+        Transaction processing is
       </span>
-      <span class="progress-percentage">{{ Math.round(progressPercentage) }}%</span>
+      <span class="progress-percentage">{{ percentage }}% complete.</span>
     </div>
 
-    <div
+
+    <div v-if="percentage > 0"
       :style="{
         width: '100%',
         height: '8px',
@@ -20,7 +21,7 @@
     >
       <div
         :style="{
-          width: progressPercentage + '%',
+          width: percentage + '%',
           height: '100%',
           background: 'linear-gradient(90deg, #4caf50, #45a049)',
           transition: 'width 0.3s ease-in-out',
@@ -59,6 +60,9 @@ const props = defineProps({
   statusText: {
     type: String,
     default: 'Ready to process'
+  },
+  percentage: {
+    default: 0
   }
 })
 

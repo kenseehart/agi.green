@@ -8,9 +8,9 @@
       class="text-input"
       id="chat-input-text"
     ></textarea>
-    <!-- <div @click="triggerFileInput" class="attach-button">
+    <div v-if="props.vertical === 'tax'" @click="triggerFileInput" class="attach-button">
       <img src="../assets/plusIcon.svg" alt="Attach file"  style="width:30px; height:30px;"/>
-    </div> -->
+    </div>
     <input
       ref="fileInput"
       type="file"
@@ -33,7 +33,12 @@ const props = defineProps({
   placeholder: {
         type: String,
         default: 'Ask anything or upload a file'
-    }
+    },
+    vertical: {
+        type: String,
+        default: null
+    },
+
 })
 function handleInput(e) {
   text.value = e.target.value;
