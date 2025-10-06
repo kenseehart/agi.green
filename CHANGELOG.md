@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.7] - 2025-07-25
+
+### Added
+- Progress bar updates escpecially for ARIA
+
+### Added
+- Improved progress bar
+
 ## [0.4.5] - 2025-07-17
 
 ### Added
